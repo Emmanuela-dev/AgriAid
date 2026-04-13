@@ -16,6 +16,9 @@ export type UseLiveAPIResults = {
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
   volume: number;
+  latestResponse: string;
+  isResponding: boolean;
+  clearLatestResponse: () => void;
 };
 
 export function useLiveAPI({
@@ -29,10 +32,12 @@ export function useLiveAPI({
   const audioStreamerRef = useRef<AudioStreamer | null>(null);
 
   const [connected, setConnected] = useState(false);
+  const [latestResponse, setLatestResponse] = useState("");
+  const [isResponding, setIsResponding] = useState(false);
   const [config, setConfig] = useState<LiveConfig>({
     model: "models/gemini-2.0-flash-live-001",
     generationConfig: {
-      responseModalities: ["AUDIO"],
+      responseModalities: ["AUDIO", "TEXT"],
       speechConfig: {
         voiceConfig: {
           prebuiltVoiceConfig: {
@@ -79,6 +84,7 @@ export function useLiveAPI({
   useEffect(() => {
     const onClose = () => {
       setConnected(false);
+      setIsResponding(false);
     };
 
     const stopAudioStreamer = () => audioStreamerRef.current?.stop();
@@ -86,16 +92,43 @@ export function useLiveAPI({
     const onAudio = (data: ArrayBuffer) =>
       audioStreamerRef.current?.addPCM16(new Uint8Array(data));
 
+    const onContent = (data: { modelTurn?: { parts?: Array<{ text?: string }> } }) => {
+      const parts = data.modelTurn?.parts || [];
+      const text = parts
+        .map((part) => part.text || "")
+        .join("")
+        .trim();
+
+      if (text) {
+        setLatestResponse((current) => {
+          if (!current) {
+            return text;
+          }
+
+          return `${current}\n${text}`;
+        });
+        setIsResponding(true);
+      }
+    };
+
+    const onTurnComplete = () => {
+      setIsResponding(false);
+    };
+
     client
       .on("close", onClose)
       .on("interrupted", stopAudioStreamer)
-      .on("audio", onAudio);
+      .on("audio", onAudio)
+      .on("content", onContent as never)
+      .on("turncomplete", onTurnComplete);
 
     return () => {
       client
         .off("close", onClose)
         .off("interrupted", stopAudioStreamer)
-        .off("audio", onAudio);
+        .off("audio", onAudio)
+        .off("content", onContent as never)
+        .off("turncomplete", onTurnComplete);
     };
   }, [client]);
 
@@ -113,6 +146,10 @@ export function useLiveAPI({
     setConnected(false);
   }, [setConnected, client]);
 
+  const clearLatestResponse = useCallback(() => {
+    setLatestResponse("");
+  }, []);
+
   return {
     client,
     config,
@@ -121,5 +158,8 @@ export function useLiveAPI({
     connect,
     disconnect,
     volume,
+    latestResponse,
+    isResponding,
+    clearLatestResponse,
   };
 }

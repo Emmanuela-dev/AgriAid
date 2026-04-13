@@ -29,6 +29,8 @@ export type ControlTrayProps = {
   children?: ReactNode;
   supportsVideo: boolean;
   onVideoStreamChange?: (stream: MediaStream | null) => void;
+  onUserTranscriptChange?: (text: string, isFinal: boolean) => void;
+  containerClassName?: string;
 };
 
 type MediaStreamButtonProps = {
@@ -76,6 +78,8 @@ function ControlTray({
   videoRef,
   children,
   onVideoStreamChange = () => {},
+  onUserTranscriptChange,
+  containerClassName,
   supportsVideo,
 }: ControlTrayProps) {
   const videoStreams = [useWebcam(), useScreenCapture()];
@@ -85,10 +89,15 @@ function ControlTray({
   const [inVolume, setInVolume] = useState(0);
   const [audioRecorder] = useState(() => new AudioRecorder());
   const [muted, setMuted] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const renderCanvasRef = useRef<HTMLCanvasElement>(null);
   const connectButtonRef = useRef<HTMLButtonElement>(null);
+  const elapsedTimerRef = useRef<number | null>(null);
+  const recognitionRef = useRef<any>(null);
+  const finalTranscriptRef = useRef("");
 
-  const { client, connected, connect, disconnect, volume } =
+  const { client, connected, connect, disconnect, volume, clearLatestResponse } =
     useLiveAPIContext();
 
   // Note: removed auto-focus on connectButton to prevent stealing focus from form inputs on other pages
@@ -101,12 +110,33 @@ function ControlTray({
   }, [inVolume]);
 
   useEffect(() => {
+    if (!isRecording) {
+      if (elapsedTimerRef.current) {
+        window.clearInterval(elapsedTimerRef.current);
+        elapsedTimerRef.current = null;
+      }
+      return;
+    }
+
+    elapsedTimerRef.current = window.setInterval(() => {
+      setElapsedSeconds((current) => current + 1);
+    }, 1000);
+
+    return () => {
+      if (elapsedTimerRef.current) {
+        window.clearInterval(elapsedTimerRef.current);
+        elapsedTimerRef.current = null;
+      }
+    };
+  }, [isRecording]);
+
+  useEffect(() => {
     const onData = (base64: string) => {
       client.sendRealtimeInput([
         { mimeType: "audio/pcm;rate=16000", data: base64 },
       ]);
     };
-    if (connected && !muted && audioRecorder) {
+    if (connected && isRecording && !muted && audioRecorder) {
       audioRecorder.on("data", onData).on("volume", setInVolume).start();
     } else {
       audioRecorder.stop();
@@ -114,7 +144,7 @@ function ControlTray({
     return () => {
       audioRecorder.off("data", onData).off("volume", setInVolume);
     };
-  }, [connected, client, muted, audioRecorder]);
+  }, [connected, client, muted, audioRecorder, isRecording]);
 
   useEffect(() => {
     if (videoRef.current) {
@@ -157,9 +187,100 @@ function ControlTray({
     }
   };
 
+  const formatElapsedTime = (totalSeconds: number) => {
+    const minutes = Math.floor(totalSeconds / 60)
+      .toString()
+      .padStart(2, "0");
+    const seconds = (totalSeconds % 60).toString().padStart(2, "0");
+    return `${minutes}:${seconds}`;
+  };
+
+  const startRecording = async () => {
+    if (!connected) {
+      await connect();
+    }
+
+    setElapsedSeconds(0);
+    finalTranscriptRef.current = "";
+    onUserTranscriptChange?.("", false);
+
+    const SpeechRecognitionCtor =
+      typeof window !== "undefined"
+        ? (window as any).SpeechRecognition ||
+          (window as any).webkitSpeechRecognition
+        : undefined;
+
+    if (SpeechRecognitionCtor) {
+      const recognition = new SpeechRecognitionCtor();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = navigator.language || "en-US";
+
+      recognition.onresult = (event: any) => {
+        let interim = "";
+        let finalText = finalTranscriptRef.current;
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0]?.transcript || "";
+          if (event.results[i].isFinal) {
+            finalText = `${finalText} ${transcript}`.trim();
+          } else {
+            interim += transcript;
+          }
+        }
+
+        finalTranscriptRef.current = finalText;
+        const merged = `${finalText} ${interim}`.trim();
+        onUserTranscriptChange?.(merged, false);
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error("Speech recognition error:", event?.error || event);
+      };
+
+      recognitionRef.current = recognition;
+      try {
+        recognition.start();
+      } catch (error) {
+        console.error("Failed to start speech recognition:", error);
+      }
+    }
+
+    setIsRecording(true);
+  };
+
+  const stopRecordingAndSubmit = async () => {
+    setIsRecording(false);
+    audioRecorder.stop();
+    const recognition = recognitionRef.current;
+    if (recognition) {
+      try {
+        recognition.stop();
+      } catch (error) {
+        console.error("Failed to stop speech recognition:", error);
+      }
+    }
+
+    onUserTranscriptChange?.(finalTranscriptRef.current.trim(), true);
+
+    if (connected) {
+      try {
+        clearLatestResponse();
+        client.send({
+          text:
+            "The farmer has finished speaking. Please answer in the same language as the recording.",
+        });
+      } catch (error) {
+        console.error("Failed to submit recording:", error);
+      }
+    }
+  };
+
   return (
     <section
-      className="
+      className={
+        containerClassName ||
+        `
         fixed 
         bottom-4 
         right-4
@@ -178,7 +299,8 @@ function ControlTray({
         ring-1
         ring-white/10
         z-50
-      "
+      `
+      }
     >
       <div className="flex flex-col items-center mb-2">
         <h2 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-emerald-600">
@@ -272,6 +394,38 @@ function ControlTray({
             {connected ? "Pause" : "Start"} Streaming
           </span>
         </button>
+
+        <div className="flex flex-col items-center gap-2">
+          <button
+            type="button"
+            onClick={isRecording ? stopRecordingAndSubmit : startRecording}
+            disabled={muted}
+            className={`
+              px-4
+              py-2
+              rounded-lg
+              text-sm
+              font-medium
+              transition-all
+              duration-300
+              ${
+                isRecording
+                  ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                  : "bg-blue-600 text-white hover:bg-blue-700"
+              }
+              disabled:opacity-50
+              disabled:cursor-not-allowed
+            `}
+          >
+            {isRecording ? "Stop & Submit" : "Start Recording"}
+          </button>
+
+          <span className="text-xs text-gray-400">
+            {isRecording
+              ? `Recording... ${formatElapsedTime(elapsedSeconds)}`
+              : "Tap start recording, speak as long as needed, then submit."}
+          </span>
+        </div>
 
         <span className="text-xs text-gray-400 opacity-70">
           {connected ? "Live" : "Offline"}
