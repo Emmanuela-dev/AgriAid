@@ -47,10 +47,10 @@ const ToolsComponent = () => {
           <div>
             <h1 className="text-4xl font-bold text-gray-900">
               {user && !user.props
-                ? `नमस्ते, ${(user as UserModel).name}`
+                ? `Hello, ${(user as UserModel).name}`
                 : "Welcome"}
             </h1>
-            <p className="text-gray-600 mt-1">Your Krushisaathi Dashboard</p>
+            <p className="text-gray-600 mt-1">Your AgriAid Dashboard</p>
           </div>
         </div>
 

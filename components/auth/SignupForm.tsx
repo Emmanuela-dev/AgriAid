@@ -39,11 +39,7 @@ const SignupForm = () => {
           username: string;
           password: string;
           cpassword: string;
-          adhaar: string;
           address: string;
-          passbook: string;
-          photo: string;
-          ekyf: string;
         }
       | {
           role: string;
@@ -137,60 +133,11 @@ const SignupForm = () => {
       is: "soil-agent",
       then: (schema) => schema.required("Phone number is required"),
     }),
-    adhaar: Yup.string().when("role", {
-      is: "farmer",
-      then: (schema) => schema.required("National ID number is required"),
-    }),
     address: Yup.string().when("role", {
       is: "farmer",
       then: (schema) => schema.required("Address is required"),
     }),
-    passbook: Yup.string().when("role", {
-      is: "farmer",
-      then: (schema) => schema.required("Passbook details are required"),
-    }),
-    photo: Yup.string().when("role", {
-      is: "farmer",
-      then: (schema) => schema.required("A photo is required"),
-    }),
-    ekyf: Yup.string().when("role", {
-      is: "farmer",
-      then: (schema) => schema.required("Farmer registration verification is required"),
-    }),
   });
-
-  const farmersDocConfig = [
-    {
-      id: "adhaar",
-      label: "National ID",
-      buttonText: "Upload ID",
-      successMessage: "National ID uploaded successfully",
-    },
-    {
-      id: "address",
-      label: "Address Proof",
-      buttonText: "Upload Address",
-      successMessage: "Address proof uploaded successfully",
-    },
-    {
-      id: "passbook",
-      label: "Bank Passbook",
-      buttonText: "Upload Passbook",
-      successMessage: "Bank passbook uploaded successfully",
-    },
-    {
-      id: "photo",
-      label: "Your Photo",
-      buttonText: "Upload Photo",
-      successMessage: "Photo uploaded successfully",
-    },
-    {
-      id: "ekyf",
-      label: "Farmer Certificate",
-      buttonText: "Upload Certificate",
-      successMessage: "Certificate uploaded successfully",
-    },
-  ];
 
   const soilAgentLocationFields = [
     {
@@ -251,11 +198,7 @@ const SignupForm = () => {
     username: "",
     password: "",
     cpassword: "",
-    adhaar: "",
     address: "",
-    passbook: "",
-    photo: "",
-    ekyf: "",
   };
 
   const SoilAgentInitialValues = {
@@ -279,54 +222,6 @@ const SignupForm = () => {
     return initialRole === "farmer"
       ? FarmerInitialValues
       : SoilAgentInitialValues;
-  };
-
-  const handleUploadSuccess = (
-    resultInfo: ResultInfo,
-    fieldName: string,
-    setFieldValue: {
-      (
-        field: string,
-        value: string,
-        shouldValidate?: boolean
-      ): Promise<void | FormikErrors<
-        | {
-            role: string;
-            username: string;
-            password: string;
-            cpassword: string;
-            labName: string;
-            latitude: string;
-            longitude: string;
-            country: string;
-            state: string;
-            district: string;
-            streetAddress: string;
-            city: string;
-            pincode: string;
-            phone: string;
-          }
-        | {
-            role: string;
-            name: string;
-            username: string;
-            password: string;
-            cpassword: string;
-            adhaar: string;
-            address: string;
-            passbook: string;
-            photo: string;
-            ekyf: string;
-          }
-      >>;
-      (arg0: string, arg1: string): void;
-    },
-    successMessage: Renderable | ValueFunction<Renderable, Toast>
-  ) => {
-    console.log("resultInfo:", resultInfo);
-
-    setFieldValue(fieldName, resultInfo.public_id);
-    toast.success(successMessage);
   };
 
   return (
@@ -696,50 +591,24 @@ const SignupForm = () => {
                       </div>
                     </div>
 
-                    <motion.div
-                      className="bg-white rounded-lg border border-gray-200 p-6"
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.3 }}
-                    >
-                      <div className="flex items-center space-x-2 mb-6">
-                        <FileText className="w-5 h-5 text-green-600" />
-                        <h3 className="text-lg font-semibold text-gray-800">
-                          Required Documents
-                        </h3>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {farmersDocConfig.map((doc) => (
-                          <div key={doc.id} className="space-y-3">
-                            <label className="block text-sm font-medium text-gray-700 text-center">
-                              {doc.label}
-                              {values[doc.id as keyof typeof values] && (
-                                <span className="ml-2 inline text-green-600">
-                                  <Verified className="w-5 inline h-5" />
-                                </span>
-                              )}
-                            </label>
-                            <UploadWidget
-                              text={doc.buttonText}
-                              onUploadSuccess={(resultInfo: ResultInfo) => {
-                                handleUploadSuccess(
-                                  resultInfo,
-                                  doc.id,
-                                  setFieldValue,
-                                  doc.successMessage
-                                );
-                              }}
-                            />
-
-                            <ErrorMessage
-                              name={doc.id}
-                              component="div"
-                              className="text-sm text-red-500"
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </motion.div>
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Address
+                      </label>
+                      <Field
+                        as="textarea"
+                        id="address"
+                        name="address"
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-shadow duration-200"
+                        placeholder="Enter your address"
+                        rows={3}
+                      />
+                      <ErrorMessage
+                        name="address"
+                        component="div"
+                        className="text-sm text-red-500"
+                      />
+                    </div>
                   </>
                 )}
 

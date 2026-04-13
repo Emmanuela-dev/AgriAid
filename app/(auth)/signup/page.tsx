@@ -33,7 +33,7 @@ const SignupPage = () => {
         <div className="p-6 flex justify-between items-center">
           <Image
             src={logo}
-            alt="Krushi Saathi Logo"
+            alt="AgriAid Logo"
             height={40}
             width={40}
             className="h-10 w-auto"
@@ -47,7 +47,7 @@ const SignupPage = () => {
                 Create an Account
               </h1>
               <p className="text-gray-600">
-                Join Krushi Saathi&apos;s farming community
+                Join AgriAid&apos;s farming community
               </p>
             </div>
 
@@ -86,7 +86,7 @@ const SignupPage = () => {
           <div className="h-full flex flex-col justify-center items-center text-white p-12">
             <h2 className="text-4xl font-bold mb-6">Empowering Farmers</h2>
             <p className="text-xl text-center max-w-2xl leading-relaxed">
-              Krushi Saathi is committed to revolutionizing agriculture through
+              AgriAid is committed to revolutionizing agriculture through
               technology, providing farmers with the tools and insights they
               need to make informed decisions and achieve better yields.
             </p>
@@ -105,8 +105,8 @@ const SignupPage = () => {
               </div>
               <div>
                 <div className="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
-                  <h3 className="text-2xl font-bold">20+</h3>
-                  <p className="text-sm mt-1">States Covered</p>
+                  <h3 className="text-2xl font-bold">47</h3>
+                  <p className="text-sm mt-1">Counties Covered</p>
                 </div>
               </div>
             </div>

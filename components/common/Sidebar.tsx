@@ -108,7 +108,7 @@ const Sidebar = () => {
         <div className="p-4 flex items-center justify-between border-b border-gray-200">
           <Image
             src={sidebarOpen ? logo : logo_small}
-            alt="Krushi Saathi Logo"
+            alt="AgriAid Logo"
             width={sidebarOpen ? 150 : 0}
             height={sidebarOpen ? 150 : 0}
             className="transition-all duration-300"
@@ -153,7 +153,7 @@ const Sidebar = () => {
 
           <Image
             src={logo_small}
-            alt="Krushi Saathi Logo"
+            alt="AgriAid Logo"
             width={40}
             height={40}
           />

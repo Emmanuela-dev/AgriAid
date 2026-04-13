@@ -61,13 +61,16 @@ const HeroSection = () => {
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6 }}
           >
-            <motion.img
-              src="https://images.unsplash.com/photo-1625246333195-78d9c38ad449?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80"
-              alt="Farming Technology"
-              className="rounded-2xl shadow-2xl"
-              whileHover={{ scale: 1.05 }}
-              transition={{ duration: 0.3 }}
-            />
+            <div className="relative group">
+              <div className="absolute -inset-4 bg-green-500/20 rounded-3xl blur-2xl group-hover:bg-green-500/30 transition-all duration-500" />
+              <motion.img
+                src="/images/hero_kenyan_farmer.png"
+                alt="Kenyan Farmer using AgriAid"
+                className="relative rounded-2xl shadow-2xl w-full h-auto object-cover aspect-[4/3]"
+                whileHover={{ scale: 1.02 }}
+                transition={{ duration: 0.3 }}
+              />
+            </div>
           </motion.div>
         </div>
       </div>

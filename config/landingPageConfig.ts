@@ -65,17 +65,20 @@ export const WORKFLOW_STEPS = [
   {
     step: "1",
     title: "Voice Input",
-    description: "Speak about your farming needs"
+    description: "Speak about your farming needs",
+    image: "https://images.unsplash.com/photo-1519337265831-281ec6cc8514?q=80&w=1000&auto=format&fit=crop"
   },
   {
     step: "2",
     title: "AI Analysis",
-    description: "Process input and analyze farming data"
+    description: "Process input and analyze farming data",
+    image: "https://images.unsplash.com/photo-1677442136019-21780ecad995?q=80&w=1000&auto=format&fit=crop"
   },
   {
     step: "3",
     title: "Smart Recommendations",
-    description: "Receive personalized farming insights"
+    description: "Receive personalized farming insights",
+    image: "https://images.unsplash.com/photo-1523348837708-15d4a09cfac2?q=80&w=1000&auto=format&fit=crop"
   }
 ];
 

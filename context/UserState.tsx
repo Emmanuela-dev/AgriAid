@@ -57,8 +57,10 @@ const RegisterationState: React.FC<RegisterationStateProps> = ({
 
       if (data.success) {
         toast.success(data.message);
+        router.push("/login");
+      } else {
+        toast.error(data.error || "Signup failed");
       }
-      router.push("/login");
     } catch (error) {
       toast.error("Error: " + error);
       console.error("Error:", error);

@@ -13,18 +13,25 @@ export async function POST(req: NextRequest) {
       username,
       password,
       role,
-      adhaar,
       country,
       state,
       district,
-      passbook,
-      photo,
-      ekyf,
       latitude,
       longitude,
       labName,
-      phone
+      phone,
+      address
     } = body;
+
+    // Use placeholder values for missing address parts if needed
+    const street = streetAddress || "";
+    const city_val = city || "";
+    const district_val = district || "";
+    const pincode_val = pincode || "";
+    const state_val = state || "";
+    const country_val = country || "";
+
+    const user_address = address || `${street}, ${city_val}, ${district_val}, ${pincode_val}, ${state_val}, ${country_val}`;
 
     // Use dummy email if username doesn't look like one
     const email = username.includes("@") ? username : `${username}@agriaid.com`;
@@ -48,12 +55,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const userId = authData.user?.id;
-    if (!userId) {
-      throw new Error("Failed to create auth user");
-    }
-
-    const fullAddress = `${streetAddress}, ${city}, ${district}, ${pincode}, ${state}, ${country}`;
+    const fullAddress = user_address;
 
     // 2. Insert into profiles or labs table
     if (role === "soil-agent") {
@@ -81,11 +83,7 @@ export async function POST(req: NextRequest) {
         name,
         username,
         role,
-        adhaar,
         address: fullAddress,
-        passbook,
-        photo,
-        ekyf
       });
 
       if (profileError) throw profileError;

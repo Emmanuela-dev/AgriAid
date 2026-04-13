@@ -41,7 +41,7 @@ const NewsComponent: React.FC<NewsComponentProps> = ({
         setError(null);
         const url =
           `https://newsdata.io/api/1/latest?` +
-          `q=farmer+india` +
+          `q=farmer+kenya` +
           `&language=en` +
           `&apiKey=${process.env.NEXT_PUBLIC_NEWS_API_KEY}` +
           `&size=10`;
@@ -83,7 +83,7 @@ const NewsComponent: React.FC<NewsComponentProps> = ({
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-IN", {
+    return new Date(dateString).toLocaleDateString("en-KE", {
       day: "numeric",
       month: "long",
       year: "numeric",

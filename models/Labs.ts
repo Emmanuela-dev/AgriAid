@@ -15,7 +15,7 @@ export interface Lab {
     streetaddress: string;
     city: string;
     country: string;
-    state: string;
+    county: string;
     district: string;
     fulladdress: string;
   };
@@ -37,7 +37,7 @@ export class LabModel implements Lab {
     streetaddress: string;
     city: string;
     country: string;
-    state: string;
+    county: string;
     district: string;
     fulladdress: string;
   };

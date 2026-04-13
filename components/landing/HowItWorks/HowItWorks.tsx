@@ -30,16 +30,25 @@ const HowItWorks = () => {
                     {WORKFLOW_STEPS.map((item, index) => (
                         <motion.div
                             key={index}
-                            className="text-center"
+                            className="bg-white rounded-2xl overflow-hidden shadow-lg border border-gray-100"
                             variants={fadeInUp}
-                            whileHover={{ scale: 1.05 }}
-                            transition={{ duration: 0.2 }}
+                            whileHover={{ y: -10 }}
+                            transition={{ duration: 0.3 }}
                         >
-                            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                                <span className="text-green-600 font-bold">{item.step}</span>
+                            <div className="h-48 overflow-hidden">
+                                <img 
+                                    src={item.image} 
+                                    alt={item.title}
+                                    className="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
+                                />
                             </div>
-                            <h3 className="text-xl font-semibold mb-3">{item.title}</h3>
-                            <p className="text-gray-600">{item.description}</p>
+                            <div className="p-8 text-center">
+                                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <span className="text-green-600 font-bold">{item.step}</span>
+                                </div>
+                                <h3 className="text-xl font-semibold mb-3">{item.title}</h3>
+                                <p className="text-gray-600 text-sm leading-relaxed">{item.description}</p>
+                            </div>
                         </motion.div>
                     ))}
                 </motion.div>
