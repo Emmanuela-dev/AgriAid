@@ -5,7 +5,16 @@ import jwt from "jsonwebtoken";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { username: email, password, role } = body;
+    const username = body?.username ?? body?.email;
+    const email = username;
+    const { password, role } = body;
+
+    if (!email || !password || !role) {
+      return new NextResponse(
+        JSON.stringify({ error: "Email, password, and role are required", success: false }),
+        { status: 400 }
+      );
+    }
 
     // 1. Sign in with Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
@@ -45,7 +54,8 @@ export async function POST(req: NextRequest) {
 
     const response = NextResponse.json({
       message: "Login successful",
-      success: true
+      success: true,
+      role: userRole
     });
 
     response.cookies.set("token", token, {
@@ -58,11 +68,12 @@ export async function POST(req: NextRequest) {
 
     return response;
   } catch (error) {
-    console.log("Login post error: ", error);
-
+    console.error("Login error:", error);
+    const errorMsg = error instanceof Error ? error.message : JSON.stringify(error);
+    console.error("Error details:", errorMsg);
     return new NextResponse(
-      JSON.stringify({ error: (error as Error).message, success: false }),
-      { status: 400 }
+      JSON.stringify({ error: errorMsg || "Internal server error", success: false }),
+      { status: 500 }
     );
   }
 }

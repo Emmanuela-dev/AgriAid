@@ -82,7 +82,12 @@ const RegisterationState: React.FC<RegisterationStateProps> = ({
       const data = await response.json();
       if (data.success) {
         toast.success(data.message);
-        router.push("/");
+        // Redirect based on role
+        if (data.role === "soil-agent") {
+          router.push("/soil-agent");
+        } else {
+          router.push("/");
+        }
       } else {
         toast.error(data.error);
       }

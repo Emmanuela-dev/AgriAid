@@ -3,8 +3,12 @@ import { useRef, useState } from "react";
 import ControlTray from "../control-tray/ControlTray";
 
 const API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY as string;
-if (typeof API_KEY !== "string") {
-  throw new Error("set NEXT_PUBLIC_GEMINI_API_KEY in .env");
+if (
+  typeof API_KEY !== "string" ||
+  API_KEY.trim().length === 0 ||
+  API_KEY.includes("replace_with")
+) {
+  throw new Error("Set NEXT_PUBLIC_GEMINI_API_KEY in .env with a valid key.");
 }
 
 const host = "generativelanguage.googleapis.com";

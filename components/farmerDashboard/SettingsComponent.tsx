@@ -38,9 +38,9 @@ const SettingsComponent = () => {
                         className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                       >
                         <option value="english">English</option>
-                        <option value="hindi">Hindi</option>
-                        <option value="punjabi">Punjabi</option>
-                        <option value="gujarati">Gujarati</option>
+                        <option value="kiswahili">Kiswahili</option>
+                        <option value="luo">Luo</option>
+                        <option value="kisii">Kisii</option>
                       </select>
                     </div>
 

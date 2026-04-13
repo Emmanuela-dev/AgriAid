@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { supabase, supabaseAdmin } from "@/lib/supabase";
 
 export async function POST(req: NextRequest) {
   try {
@@ -10,7 +10,6 @@ export async function POST(req: NextRequest) {
       pincode,
       streetAddress,
       city,
-      username: email,
       password,
       role,
       country,
@@ -22,6 +21,16 @@ export async function POST(req: NextRequest) {
       phone,
       address
     } = body;
+
+    const username = body?.username ?? body?.email;
+    const email = username;
+
+    if (!email || !password || !role) {
+      return NextResponse.json(
+        { error: "Email, password and role are required", success: false },
+        { status: 400 }
+      );
+    }
 
     // Use placeholder values for missing address parts if needed
     const street = streetAddress || "";
@@ -71,9 +80,9 @@ export async function POST(req: NextRequest) {
     const userId = authData.user.id;
     const fullAddress = user_address;
 
-    // 2. Insert into profiles or labs table
+    // 2. Insert into profiles or labs table using admin client to bypass RLS
     if (role === "soil-agent") {
-      const { error: labError } = await supabase.from("labs").insert({
+      const { error: labError } = await supabaseAdmin.from("labs").insert({
         id: userId,
         lab_name: labName,
         username: email,
@@ -92,7 +101,7 @@ export async function POST(req: NextRequest) {
 
       if (labError) throw labError;
     } else {
-      const { error: profileError } = await supabase.from("profiles").insert({
+      const { error: profileError } = await supabaseAdmin.from("profiles").insert({
         id: userId,
         name,
         username: email,
@@ -108,10 +117,12 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    console.error("Error processing request:", error);
+    console.error("Signup error:", error);
+    const errorMsg = error instanceof Error ? error.message : JSON.stringify(error);
+    console.error("Error details:", errorMsg);
     return NextResponse.json(
       {
-        error: (error as Error).message || "Something went wrong",
+        error: errorMsg || "Something went wrong",
         success: false
       },
       { status: 500 }

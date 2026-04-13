@@ -1,9 +1,18 @@
 "use client";
-import React, { useEffect, useState, useCallback } from "react";
-import { GoogleMap, Marker, useJsApiLoader } from "@react-google-maps/api";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  CircleMarker,
+  MapContainer,
+  Marker,
+  Polyline,
+  Popup,
+  TileLayer,
+  useMap,
+} from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 
 interface GoogleMapProps {
-  subscriptionKey: string;
   locations: { position: { latitude: number; longitude: number }; labName: string }[];
   destination: { longitude: number; latitude: number } | null;
   setDestination: (destination: {
@@ -12,20 +21,56 @@ interface GoogleMapProps {
   }) => void;
 }
 
-const containerStyle = {
-  width: "full",
-  height: "100vh",
+type LatLng = [number, number];
+
+const userIcon = L.divIcon({
+  className: "",
+  html: "<div style='width:14px;height:14px;background:#2563eb;border:3px solid white;border-radius:9999px;box-shadow:0 0 8px rgba(37,99,235,.6);'></div>",
+  iconSize: [14, 14],
+  iconAnchor: [7, 7],
+});
+
+const labIcon = L.divIcon({
+  className: "",
+  html: "<div style='width:12px;height:12px;background:#16a34a;border:2px solid white;border-radius:9999px;box-shadow:0 0 6px rgba(22,163,74,.6);'></div>",
+  iconSize: [12, 12],
+  iconAnchor: [6, 6],
+});
+
+const toRad = (value: number) => (value * Math.PI) / 180;
+const distanceMeters = (a: LatLng, b: LatLng) => {
+  const R = 6371000;
+  const dLat = toRad(b[0] - a[0]);
+  const dLng = toRad(b[1] - a[1]);
+  const lat1 = toRad(a[0]);
+  const lat2 = toRad(b[0]);
+
+  const sinDLat = Math.sin(dLat / 2);
+  const sinDLng = Math.sin(dLng / 2);
+  const x =
+    sinDLat * sinDLat + Math.cos(lat1) * Math.cos(lat2) * sinDLng * sinDLng;
+
+  return 2 * R * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+};
+
+const FitBounds: React.FC<{ points: LatLng[] }> = ({ points }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (points.length === 0) return;
+    const bounds = L.latLngBounds(points);
+    map.fitBounds(bounds, { padding: [40, 40] });
+  }, [map, points]);
+
+  return null;
 };
 
 const CustomGoogleMap: React.FC<GoogleMapProps> = ({
-  subscriptionKey,
   locations,
   destination,
   setDestination,
 }) => {
-  const [map, setMap] = useState<google.maps.Map | null>(null);
-  const [routePolyline, setRoutePolyline] =
-    useState<google.maps.Polyline | null>(null);
+  const [routePath, setRoutePath] = useState<LatLng[]>([]);
   const [userLocation, setUserLocation] = useState<{
     lat: number;
     lng: number;
@@ -44,165 +89,104 @@ const CustomGoogleMap: React.FC<GoogleMapProps> = ({
     );
   }, []);
 
-  // Fit bounds to include user location and 3 nearest labs
   useEffect(() => {
-    if (window.google?.maps?.geometry && map && userLocation) {
-      const bounds = new window.google.maps.LatLngBounds();
-
-      const nearestLocations = locations
-        .map((location) => {
-          const latLng = new window.google.maps.LatLng(
-            location.position.latitude,
-            location.position.longitude
-          );
-
-          return {
-            ...location,
-            latLng,
-            distance:
-              window.google.maps.geometry.spherical.computeDistanceBetween(
-                new window.google.maps.LatLng(
-                  userLocation.lat,
-                  userLocation.lng
-                ),
-                latLng
-              ),
-          };
-        })
-        .sort((a, b) => a.distance - b.distance)
-        .slice(0, 3);
-
-      nearestLocations.forEach((location) => {
-        bounds.extend(location.latLng);
-      });
-      bounds.extend(
-        new window.google.maps.LatLng(userLocation.lat, userLocation.lng)
-      );
-
-      // Fit bounds to include user location and 3 nearest labs
-      map.fitBounds(bounds);
-    }
-  }, [locations, userLocation, map]);
-  const fetchRoute = useCallback(
-    async (origin: { lat: number; lng: number }, destination: { latitude: number; longitude: number }) => {
-      const url = `https://routes.googleapis.com/directions/v2:computeRoutes`;
-
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Goog-Api-Key": subscriptionKey,
-          "X-Goog-FieldMask":
-            "routes.polyline.encodedPolyline,routes.legs,routes.distanceMeters,routes.duration",
-        },
-        body: JSON.stringify({
-          origin: {
-            location: {
-              latLng: {
-                latitude: origin.lat,
-                longitude: origin.lng,
-              },
-            },
-          },
-          destination: {
-            location: {
-              latLng: {
-                latitude: destination.latitude,
-                longitude: destination.longitude,
-              },
-            },
-          },
-          travelMode: "DRIVE",
-        }),
-      });
-
-      const data = await response.json();
-      return data.routes?.[0]?.polyline?.encodedPolyline;
-    },
-    [subscriptionKey]
-  ); // Dependency array to avoid unnecessary recreation
-
-  useEffect(() => {
-    if (map && userLocation && destination) {
-      fetchRoute(userLocation, destination).then((encodedPolyline) => {
-
-        if (encodedPolyline) {
-          if (routePolyline) {
-            routePolyline.setMap(null);
-          }
-
-          const decodedPath =
-            window.google.maps.geometry.encoding.decodePath(encodedPolyline);
-          const polyline = new window.google.maps.Polyline({
-            path: decodedPath,
-            geodesic: true,
-            strokeColor: "#0000ff",
-            strokeOpacity: 1.0,
-            strokeWeight: 3,
-          });
-
-          polyline.setMap(map);
-          setRoutePolyline(polyline);
-        } else {
-          console.error("Failed to fetch route.");
-        }
-      });
-    }
-  }, [map, userLocation, destination, fetchRoute, routePolyline]);
-
-  const { isLoaded } = useJsApiLoader({
-    id: "google-map-script",
-    googleMapsApiKey: subscriptionKey,
-    libraries: ["geometry", "places"],
-  });
-
-  const onLoad = useCallback((map: google.maps.Map) => {
-    if (!window.google) return;
-    setMap(map);
-  }, []);
-
-  const onUnmount = useCallback(() => {
-    setMap(null);
-  }, []);
-
-  const userLocationIcon = isLoaded
-    ? {
-        url: "/assets/icons/user-location.svg",
-        scaledSize: new window.google.maps.Size(40, 40),
-        origin: new window.google.maps.Point(0, 0),
-        anchor: new window.google.maps.Point(20, 40),
+    const fetchRoute = async () => {
+      if (!userLocation || !destination) {
+        setRoutePath([]);
+        return;
       }
-    : undefined;
+
+      try {
+        const url = `https://router.project-osrm.org/route/v1/driving/${userLocation.lng},${userLocation.lat};${destination.longitude},${destination.latitude}?overview=full&geometries=geojson`;
+        const response = await fetch(url);
+        const data = await response.json();
+        const coordinates = data?.routes?.[0]?.geometry?.coordinates;
+
+        if (!Array.isArray(coordinates)) {
+          setRoutePath([]);
+          return;
+        }
+
+        const points: LatLng[] = coordinates.map((coord: [number, number]) => [
+          coord[1],
+          coord[0],
+        ]);
+        setRoutePath(points);
+      } catch (error) {
+        console.error("Failed to fetch OSRM route", error);
+        setRoutePath([]);
+      }
+    };
+
+    fetchRoute();
+  }, [userLocation, destination]);
+
+  const fitPoints = useMemo(() => {
+    if (!userLocation) return [] as LatLng[];
+
+    const userPoint: LatLng = [userLocation.lat, userLocation.lng];
+    const nearest = [...locations]
+      .map((location) => ({
+        point: [location.position.latitude, location.position.longitude] as LatLng,
+        distance: distanceMeters(userPoint, [
+          location.position.latitude,
+          location.position.longitude,
+        ]),
+      }))
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, 3)
+      .map((entry) => entry.point);
+
+    return [userPoint, ...nearest];
+  }, [locations, userLocation]);
 
   return (
-    isLoaded && (
-      <GoogleMap
-        mapContainerStyle={containerStyle}
-        center={userLocation || { lat: 0, lng: 0 }}
-        onLoad={onLoad}
-        onUnmount={onUnmount}
-      >
-        {userLocation && (
-          <Marker position={userLocation} icon={userLocationIcon} />
-        )}
-        {locations.map((location, index) => (
-          <Marker
-            key={index}
-            position={{
-              lat: location.position.latitude,
-              lng: location.position.longitude,
-            }}
-            onClick={() => {
+    <MapContainer
+      center={userLocation ? [userLocation.lat, userLocation.lng] : [0, 0]}
+      zoom={11}
+      style={{ width: "100%", height: "100vh" }}
+      scrollWheelZoom={true}
+    >
+      <TileLayer
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+      />
+
+      {fitPoints.length > 0 && <FitBounds points={fitPoints} />}
+
+      {userLocation && (
+        <Marker position={[userLocation.lat, userLocation.lng]} icon={userIcon}>
+          <Popup>Your Location</Popup>
+        </Marker>
+      )}
+
+      {locations.map((location, index) => (
+        <Marker
+          key={index}
+          position={[location.position.latitude, location.position.longitude]}
+          icon={labIcon}
+          eventHandlers={{
+            click: () => {
               setDestination(location.position);
-            }}
-            label={{
-              text: location.labName,
-              className: "marker-label",
-            }}
-          />
-        ))}
-      </GoogleMap>
-    )
+            },
+          }}
+        >
+          <Popup>{location.labName}</Popup>
+        </Marker>
+      ))}
+
+      {routePath.length > 0 && (
+        <Polyline positions={routePath} pathOptions={{ color: "#2563eb", weight: 4 }} />
+      )}
+
+      {destination && (
+        <CircleMarker
+          center={[destination.latitude, destination.longitude]}
+          radius={8}
+          pathOptions={{ color: "#0f766e", fillColor: "#14b8a6", fillOpacity: 0.8 }}
+        />
+      )}
+    </MapContainer>
   );
 };
 

@@ -23,6 +23,21 @@ import {
 } from "@/types/multimodal-live-types";
 import { base64ToArrayBuffer, blobToJSON } from "@/utils/utils";
 
+const parseIncomingMessage = async (
+  data: string | Blob | ArrayBuffer
+): Promise<LiveIncomingMessage> => {
+  if (typeof data === "string") {
+    return JSON.parse(data) as LiveIncomingMessage;
+  }
+
+  if (data instanceof Blob) {
+    return (await blobToJSON(data)) as LiveIncomingMessage;
+  }
+
+  const text = new TextDecoder().decode(data);
+  return JSON.parse(text) as LiveIncomingMessage;
+};
+
 /**
  * the events that this client will emit
  */
@@ -82,9 +97,14 @@ export class MultimodalLiveClient extends EventEmitter<MultimodalLiveClientEvent
     const ws = new WebSocket(this.url);
 
     ws.addEventListener("message", async (evt: MessageEvent) => {
-      if (evt.data instanceof Blob) {
-        this.receive(evt.data);
-      } 
+      try {
+        const response = await parseIncomingMessage(
+          evt.data as string | Blob | ArrayBuffer
+        );
+        this.receive(response);
+      } catch (error) {
+        this.log("client.parseError", (error as Error).message);
+      }
     });
     return new Promise((resolve, reject) => {
       const onError = (ev: Event) => {
@@ -147,10 +167,7 @@ export class MultimodalLiveClient extends EventEmitter<MultimodalLiveClientEvent
     return false;
   }
 
-  protected async receive(blob: Blob) {
-    const response: LiveIncomingMessage = (await blobToJSON(
-      blob
-    )) as LiveIncomingMessage;
+  protected async receive(response: LiveIncomingMessage) {
     if (isToolCallMessage(response)) {
       this.log("server.toolCall", response);
       this.emit("toolcall", response.toolCall);

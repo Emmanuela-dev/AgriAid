@@ -22,7 +22,9 @@ export type LiveConfig = {
 };
 
 export type LiveGenerationConfig = GenerationConfig & {
-  responseModalities: "text" | "audio" | "image";
+  responseModalities: Array<
+    "TEXT" | "AUDIO" | "IMAGE" | "text" | "audio" | "image"
+  >;
   speechConfig?: {
     voiceConfig?: {
       prebuiltVoiceConfig?: {

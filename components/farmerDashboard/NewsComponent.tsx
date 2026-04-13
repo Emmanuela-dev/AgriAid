@@ -39,18 +39,32 @@ const NewsComponent: React.FC<NewsComponentProps> = ({
       try {
         setLoading(true);
         setError(null);
+        
+        // Check if API key is configured
+        if (!process.env.NEXT_PUBLIC_NEWS_API_KEY || process.env.NEXT_PUBLIC_NEWS_API_KEY.includes("replace_with")) {
+          setError("News API key not configured. Please add your newsdata.io API key to .env file.");
+          setLoading(false);
+          return;
+        }
+
         const url =
           `https://newsdata.io/api/1/latest?` +
-          `q=farmer+kenya` +
+          `q=farmer+agriculture` +
           `&language=en` +
           `&apiKey=${process.env.NEXT_PUBLIC_NEWS_API_KEY}` +
           `&size=10`;
 
         const response = await fetch(url);
         if (!response.ok) {
-          throw new Error("Failed to fetch news");
+          throw new Error(`API error: ${response.status}`);
         }
         const data = await response.json();
+        
+        if (!data.results || data.results.length === 0) {
+          setError("No news articles found.");
+          return;
+        }
+        
         setNews(
           data.results.filter(
             (article: Article) =>
@@ -59,8 +73,8 @@ const NewsComponent: React.FC<NewsComponentProps> = ({
           )
         );
       } catch (error) {
-        console.error("Error:", error);
-        setError("Failed to load news. Please try again later.");
+        console.error("Error fetching news:", error);
+        setError("Failed to load news. Please check your API key and try again later.");
       } finally {
         setLoading(false);
       }

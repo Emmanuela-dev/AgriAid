@@ -17,7 +17,6 @@ const Page = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const router = useRouter();
-  const subscriptionKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 
   const labContext = useContext(LabContext);
 
@@ -175,7 +174,6 @@ const Page = () => {
           </button>
         )}
         <GoogleMap
-          subscriptionKey={subscriptionKey}
           locations={locations}
           destination={destination}
           setDestination={setDestination}
