@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
       pincode,
       streetAddress,
       city,
-      username,
+      username: email,
       password,
       role,
       country,
@@ -33,9 +33,6 @@ export async function POST(req: NextRequest) {
 
     const user_address = address || `${street}, ${city_val}, ${district_val}, ${pincode_val}, ${state_val}, ${country_val}`;
 
-    // Use dummy email if username doesn't look like one
-    const email = username.includes("@") ? username : `${username}@agriaid.com`;
-
     // 1. Create Supabase Auth User
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
@@ -43,18 +40,35 @@ export async function POST(req: NextRequest) {
       options: {
         data: {
           role,
-          username
+          username: email
         }
       }
     });
 
     if (authError) {
+      // Provide clear, specific error messages for common Supabase errors
+      let errorMessage = authError.message;
+      if (authError.message.includes("rate limit") || authError.status === 429) {
+        errorMessage = "Too many signup attempts. Please wait a few minutes and try again.";
+      } else if (authError.message.includes("already registered") || authError.message.includes("already exists")) {
+        errorMessage = "This email is already registered. Please log in instead.";
+      } else if (authError.message.includes("invalid") && authError.message.includes("email")) {
+        errorMessage = "Please enter a valid email address (e.g. name@gmail.com).";
+      }
       return NextResponse.json(
-        { error: authError.message, success: false },
+        { error: errorMessage, success: false },
         { status: 400 }
       );
     }
 
+    if (!authData.user) {
+      return NextResponse.json(
+        { error: "User creation failed", success: false },
+        { status: 400 }
+      );
+    }
+
+    const userId = authData.user.id;
     const fullAddress = user_address;
 
     // 2. Insert into profiles or labs table
@@ -62,7 +76,7 @@ export async function POST(req: NextRequest) {
       const { error: labError } = await supabase.from("labs").insert({
         id: userId,
         lab_name: labName,
-        username,
+        username: email,
         phone,
         address: {
           country,
@@ -81,7 +95,7 @@ export async function POST(req: NextRequest) {
       const { error: profileError } = await supabase.from("profiles").insert({
         id: userId,
         name,
-        username,
+        username: email,
         role,
         address: fullAddress,
       });

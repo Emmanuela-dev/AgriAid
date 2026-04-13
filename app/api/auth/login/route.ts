@@ -5,9 +5,7 @@ import jwt from "jsonwebtoken";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { username, password, role } = body;
-
-    const email = username.includes("@") ? username : `${username}@agriaid.com`;
+    const { username: email, password, role } = body;
 
     // 1. Sign in with Supabase Auth
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({

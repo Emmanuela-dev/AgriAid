@@ -91,11 +91,7 @@ function ControlTray({
   const { client, connected, connect, disconnect, volume } =
     useLiveAPIContext();
 
-  useEffect(() => {
-    if (!connected && connectButtonRef.current) {
-      connectButtonRef.current.focus();
-    }
-  }, [connected]);
+  // Note: removed auto-focus on connectButton to prevent stealing focus from form inputs on other pages
 
   useEffect(() => {
     document.documentElement.style.setProperty(
@@ -166,24 +162,22 @@ function ControlTray({
       className="
         fixed 
         bottom-4 
-        left-1/2 
-        transform 
-        -translate-x-1/2 
+        right-4
         bg-gray-900/90 
         backdrop-blur-xl 
         rounded-2xl 
         shadow-2xl 
         border 
         border-gray-800/50 
-        p-6 
-        w-[calc(100%-2rem)] 
-        max-w-xl 
+        p-4
+        w-auto
         flex 
         flex-col 
         items-center 
         space-y-4
         ring-1
         ring-white/10
+        z-50
       "
     >
       <div className="flex flex-col items-center mb-2">

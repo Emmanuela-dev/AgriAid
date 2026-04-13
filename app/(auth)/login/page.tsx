@@ -1,14 +1,21 @@
 "use client";
-import React, { useContext } from "react";
+import React, { useContext, useEffect } from "react";
 import LoginForm from "@/components/auth/LoginForm";
-import Image from "next/image";
 import Link from "next/link";
 import UserContext from "@/context/UserContext";
-import { logo, mission } from "@/config/ImagesUrl";
+import { mission } from "@/config/ImagesUrl";
 import { Tractor, Sprout } from "lucide-react";
 
 const LoginPage = () => {
   const userContext = useContext(UserContext);
+
+  // Reset loading state when the login page mounts.
+  // UserState persists across client-side navigation, so loading might
+  // still be `true` after a signup redirect — which disables all form inputs.
+  useEffect(() => {
+    userContext?.setLoading(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally empty: run once on mount only
 
   if (!userContext) {
     return (
@@ -27,86 +34,86 @@ const LoginPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      <div className="w-full lg:w-[45%] flex flex-col mb-6">
-        <div className="px-6 flex justify-between items-center">
-          <Image
-            src={logo}
-            alt="AgriAid Logo"
-            height={100}
-            width={100}
-          />
+    <div className="min-h-screen bg-white flex overflow-hidden">
+      {/* Left Panel - Login Form */}
+      <div className="w-full lg:w-[45%] flex flex-col relative">
+        {/* Decorative Background Pattern */}
+        <div className="absolute inset-0 opacity-[0.03] pointer-events-none" 
+             style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23059669' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")` }} 
+        />
+        
+        <div className="p-8 flex items-center justify-between z-10">
+          <Link href="/" className="flex items-center space-x-2 group">
+            <div className="bg-green-600 p-2 rounded-xl group-hover:scale-110 transition-transform">
+              <Sprout className="text-white w-6 h-6" />
+            </div>
+            <span className="text-2xl font-bold text-gray-900 tracking-tight">AgriAid</span>
+          </Link>
         </div>
 
-        <div className="flex-1 flex flex-col justify-center px-8 sm:px-12 lg:px-16 xl:px-20">
+        <div className="flex-1 flex flex-col justify-center px-8 sm:px-12 lg:px-16 xl:px-24 z-10">
           <div className="w-full max-w-md mx-auto">
-            <div className="text-center mb-8">
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                Welcome Back!
+            <div className="mb-10 text-center lg:text-left">
+              <h1 className="text-4xl font-extrabold text-gray-900 mb-3 tracking-tight">
+                Welcome Back
               </h1>
-              <p className="text-gray-600">
-                Login to access your farming insights
+              <p className="text-gray-500 text-lg">
+                Enter your details to access your dashboard
               </p>
             </div>
 
             <LoginForm />
 
-            <div className="mt-6 relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-4 bg-gray-50 text-gray-500">or</span>
-              </div>
-            </div>
-
-            <div className="mt-6 text-center">
-              <p className="text-gray-600">New to AgriAid?</p>
-              <Link
-                href="/signup"
-                className="mt-2 inline-flex items-center text-green-600 hover:text-green-700 font-medium"
-              >
-                <Sprout className="w-4 h-4 mr-2" />
-                Create an Account
-              </Link>
+            <div className="mt-10 pt-8 border-t border-gray-100 text-center">
+              <p className="text-gray-500">
+                Don't have an account?{" "}
+                <Link
+                  href="/signup"
+                  className="text-green-600 font-bold hover:text-green-700 transition-colors ml-1"
+                >
+                  Create free account
+                </Link>
+              </p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Right Panel - Mission Statement */}
-      <div className="hidden lg:block lg:w-[55%] relative">
+      <div className="hidden lg:block lg:w-[55%] relative overflow-hidden">
         <div
-          className="absolute inset-0 bg-cover bg-center"
+          className="absolute inset-0 bg-cover bg-center transition-transform duration-[20s] hover:scale-110 pointer-events-none"
           style={{
-            backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.5)), url(${mission})`,
+            backgroundImage: `linear-gradient(to right, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.3)), url(${mission})`,
           }}
-        >
-          <div className="h-full flex flex-col justify-center items-center text-white p-12">
-            <h2 className="text-4xl font-bold mb-6">Empowering Farmers</h2>
-            <p className="text-xl text-center max-w-2xl leading-relaxed">
-              AgriAid is committed to revolutionizing agriculture through
-              technology, providing farmers with the tools and insights they
-              need to make informed decisions and achieve better yields.
+        />
+        <div className="relative h-full flex flex-col justify-center items-start text-white p-20 xl:p-32">
+          <div className="space-y-8 max-w-2xl">
+            <div className="inline-block px-4 py-1.5 bg-green-500/20 backdrop-blur-md rounded-full border border-green-500/30 text-green-400 text-sm font-bold uppercase tracking-widest">
+              Our Vision 2026
+            </div>
+            <h2 className="text-5xl xl:text-6xl font-black leading-tight">
+              Revolutionizing <br />
+              <span className="text-green-500 underline decoration-green-500/30">Kenyan Farming</span>
+            </h2>
+            <p className="text-xl text-gray-200 leading-relaxed font-light">
+              AgriAid is building a digital ecosystem that empowers local farmers with
+              real-time soil analytics, crop optimization tools, and a global
+              marketplace for shared prosperity.
             </p>
-            <div className="mt-12 grid grid-cols-3 gap-8 text-center">
+            
+            <div className="pt-10 grid grid-cols-3 gap-10 border-t border-white/10">
               <div>
-                <div className="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
-                  <h3 className="text-2xl font-bold">10,000+</h3>
-                  <p className="text-sm mt-1">Farmers Served</p>
-                </div>
+                <h3 className="text-3xl font-bold mb-1">10K+</h3>
+                <p className="text-gray-400 text-sm font-medium">Farmers Joined</p>
               </div>
               <div>
-                <div className="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
-                  <h3 className="text-2xl font-bold">50,000+</h3>
-                  <p className="text-sm mt-1">Soil Tests</p>
-                </div>
+                <h3 className="text-3xl font-bold mb-1">50K+</h3>
+                <p className="text-gray-400 text-sm font-medium">Soil Tests Done</p>
               </div>
               <div>
-                <div className="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
-                  <h3 className="text-2xl font-bold">47</h3>
-                  <p className="text-sm mt-1">Counties Covered</p>
-                </div>
+                <h3 className="text-3xl font-bold mb-1">47</h3>
+                <p className="text-gray-400 text-sm font-medium">Counties Covered</p>
               </div>
             </div>
           </div>

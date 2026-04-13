@@ -86,7 +86,7 @@ const SignupForm = () => {
       is: "farmer",
       then: (schema) => schema.required("Lab Name is required"),
     }),
-    username: Yup.string().required("Username is required"),
+    username: Yup.string().email("Invalid email address").required("Email is required"),
     password: Yup.string()
       .min(6, "Password must be at least 6 characters long")
       .required("Password is required"),
@@ -305,14 +305,14 @@ const SignupForm = () => {
 
                     <div className="space-y-2">
                       <label className="block text-sm font-medium text-gray-700">
-                        Username/Phone
+                        Email Address
                       </label>
                       <Field
-                        type="text"
+                        type="email"
                         id="username"
                         name="username"
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-shadow duration-200"
-                        placeholder="Enter username or phone number"
+                        placeholder="e.g. name@gmail.com"
                       />
                       <ErrorMessage
                         name="username"
@@ -511,14 +511,14 @@ const SignupForm = () => {
 
                     <div className="space-y-2">
                       <label className="block text-sm font-medium text-gray-700">
-                        Username/Phone
+                        Email Address
                       </label>
                       <Field
-                        type="text"
+                        type="email"
                         id="username"
                         name="username"
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-shadow duration-200"
-                        placeholder="Enter username or phone number"
+                        placeholder="e.g. name@gmail.com"
                       />
                       <ErrorMessage
                         name="username"
