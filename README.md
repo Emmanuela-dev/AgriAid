@@ -1,188 +1,133 @@
-# 🌾 AgriAid
+# GIW - Soil Testing and Farmer Support Platform
 
-**Empowering Farmers Worldwide with Technology**
+GIW is a Next.js application that supports farmers and soil labs with soil sample registration, test progress tracking, report viewing, and smart recommendations.
 
-AgriAid is a comprehensive agri-tech platform aimed at supporting farmers globally by providing real-time weather forecasts, crop recommendations, market prices, and government scheme updates in their native languages. With a voice assistant and easy-to-use interface, AgriAid ensures even semi-literate or illiterate farmers can make informed decisions to improve yield, reduce losses, and increase profitability.
+## Overview
 
- **Link to the Repo of ML models:** https://github.com/Lord3008/AGRI_AI 
+The app includes:
 
----
+- Farmer and lab authentication flows
+- Soil sample registration and status tracking
+- Test result and report views
+- Soil agent dashboard features
+- Voice and multimodal assistant utilities
+- News and learning resources for farmers
 
-## 🚀 Features
+## Tech Stack
 
-- 📱 **Multilingual Support** – Interface in multiple global and regional languages
-- 🎙️ **Voice Assistant** – For hands-free access and ease of use
-- 🌦️ **Weather Forecasting** – Location-based alerts and predictions
-- 🧪 **Soil Health Insights** – Integration with soil health data
-- 📈 **Crop Recommendation** – Based on season, soil, and weather
-- 🧑‍🌾 **Government Scheme Updates** – Timely info on subsidies, schemes
-- 🛒 **Market Price Alerts** – Real-time market prices for key crops from global markets
-- 💬 **Query Forum / Chatbot** – For instant help and farmer community interaction
+- Framework: Next.js 15 (App Router)
+- Language: TypeScript
+- UI: React 19, Tailwind CSS 4, Radix UI
+- Data and auth: Supabase
+- Integrations: Gemini API, Google Maps, Cloudinary, News API
 
----
+## Prerequisites
 
-## 🛠️ Tech Stack
+- Node.js 20+
+- npm 10+
 
-- **Frontend**: React Native / Flutter (for mobile), React.js (for web)
-- **Backend**: Node.js / Express
-- **Database**: MongoDB / Firebase
-- **APIs**: OpenWeather, AgriMarket, Soil Health Card API
-- **ML**: TensorFlow.js / Python backend for crop prediction
+## Getting Started
 
----
-
-## 🧑‍💻 Installation
+1. Install dependencies:
 
 ```bash
-# Clone the repository
-git clone https://github.com/agriaid/agriaid.git
-cd AgriAid
-
-# Install dependencies
 npm install
+```
 
-# Run the development server
+2. Create your environment file:
+
+```bash
+cp .env.example .env
+```
+
+If `.env.example` is not present, create `.env` manually with the variables listed below.
+
+3. Run the development server:
+
+```bash
 npm run dev
 ```
 
-## 🧪 Demo
+4. Open http://localhost:3000
 
-You can try the working prototype at:
-👉 [AgriAid Prototype](https://agriaid.example.app/)
+## Environment Variables
 
----
-## 📷 Screenshots
+Set these values in `.env`:
 
-![ss2](https://github.com/user-attachments/assets/f046f419-b38a-40bf-86a2-aa47443a8e71)
+```dotenv
+# App base URL
+NEXT_PUBLIC_DOMAIN=http://localhost:3000
 
-![ss1](https://github.com/user-attachments/assets/c18a3a0e-4166-411a-9f50-9db33287d372)
+# Auth
+NEXT_PUBLIC_TOKEN_SECRETE=replace_with_a_strong_random_secret
 
-![ss3](https://github.com/user-attachments/assets/fa2f74e5-fa72-45a3-97a8-d3241bb78106)
+# Gemini
+NEXT_PUBLIC_GEMINI_API_KEY=replace_with_gemini_api_key
 
-![ss4](https://github.com/user-attachments/assets/3f776c9e-7eec-4e52-aeba-5026a46e0e2a)
+# Google Maps / Routes
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=replace_with_google_maps_api_key
 
-![ss5](https://github.com/user-attachments/assets/ee9698ab-8b4d-44ba-91d9-dc266c5c0ae4)
+# News API
+NEXT_PUBLIC_NEWS_API_KEY=replace_with_news_api_key
 
-![ss6](https://github.com/user-attachments/assets/60fc65c5-9aaa-4c64-b6b1-7d7954f52892)
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=replace_with_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=replace_with_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=replace_with_supabase_service_role_key
 
----
-
-## 📄 Project Structure
-
-```
-├── .dockerignore
-├── .gitignore
-├── Dockerfile
-├── README.md
-├── favicon.ico
-├── globals.css
-├── layout.tsx
-├── middleware.ts
-├── next.config.ts
-├── package.json
-├── package-lock.json
-├── postcss.config.mjs
-├── tsconfig.json
-
-├── app
-│   ├── (auth)/login/page.tsx
-│   ├── (auth)/signup/page.tsx
-│   ├── (dashboard)/soil-agent/page.tsx
-│   ├── (features)/
-│   │   ├── register-soil-sample/[id]/page.tsx
-│   │   ├── register-soil-sample/page.tsx
-│   │   ├── results/[id]/page.tsx
-│   │   ├── smart-recommendations/page.tsx
-│   │   ├── test-progress/[id]/page.tsx
-│   │   └── view-report/page.tsx
-│   ├── (static)/how-to/page.tsx
-│   ├── (static)/landing/page.tsx
-│   ├── (static)/soil-testing/page.tsx
-│   ├── api/
-│   │   ├── auth/{login, logout, signup}/route.ts
-│   │   ├── soil-agent/labs/[id]/route.ts
-│   │   ├── soil-agent/labs/route.ts
-│   │   ├── user/{checkAuth, route}.ts
-│   │   └── yards/{[id], route, sendReport}/route.ts
-│   └── page.tsx
-
-├── components/
-│   ├── audio-pulse/
-│   ├── auth/
-│   ├── common/
-│   ├── control-tray/
-│   ├── farmerDashboard/
-│   ├── landing/
-│   ├── soilAgent/
-│   ├── soilTestingRegistration/
-│   └── ui/
-
-├── config/
-│   ├── ImagesUrl.ts
-│   ├── landingPageConfig.ts
-│   └── statesData.ts
-
-├── context/
-│   ├── LabContext.tsx / LabState.tsx
-│   ├── LiveAPIContext.tsx
-│   ├── NavigationContext.tsx / NavigationState.tsx
-│   ├── UserContext.tsx / UserState.tsx
-│   ├── YardContext.tsx / YardState.tsx
-
-├── hooks/
-│   ├── use-live-api.ts
-│   ├── use-media-stream-mux.ts
-│   ├── use-screen-capture.ts
-│   └── use-webcam.ts
-
-├── lib/
-│   ├── audio-{recorder, streamer}.ts
-│   ├── audioworklet-registry.ts
-│   ├── multimodal-live-client.ts
-│   ├── store-logger.ts
-│   ├── firebase/FirebaseConfig.js
-│   └── worklets/{audio-processing, vol-meter}.ts
-
-├── models/
-│   ├── Labs.ts
-│   ├── User.ts
-│   └── Yard.ts
-
-├── public/assets/icons/
-│   └── *.svg
-
-├── types/
-│   └── multimodal-live-types.ts
-
-├── utils/
-│   ├── customImageLoader.js
-│   ├── ststs-card.tsx
-│   └── utils.ts
+# Cloudinary
+NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET=replace_with_cloudinary_upload_preset
+NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME=replace_with_cloudinary_cloud_name
 ```
 
-## 🌱 Vision
+Notes:
 
-> “To bridge the gap between traditional farming and modern technology, making agricultural knowledge and services accessible to every farmer, everywhere.”
+- Do not commit real keys or secrets.
+- `SUPABASE_SERVICE_ROLE_KEY` must only be used server-side.
+- Keep `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` enabled (not commented out) when map features are needed.
 
----
+## Available Scripts
 
-## 🤝 Contributing
+- `npm run dev` - Start local dev server with Turbopack
+- `npm run build` - Build for production
+- `npm run start` - Run production build
+- `npm run lint` - Run lint checks
 
-We welcome contributions! If you'd like to improve AgriAid:
+## Project Structure
 
-1. Fork this repo
-2. Create a new branch: `git checkout -b feature/your-feature`
-3. Make your changes and commit: `git commit -m 'Add your feature'`
-4. Push to your branch: `git push origin feature/your-feature`
-5. Open a pull request 🙌
+```
+app/
+	(auth)/             # Login and signup pages
+	(dashboard)/        # Dashboard routes
+	(features)/         # Feature pages (sample registration, results, reports)
+	(static)/           # Static pages (landing/how-to/soil-testing)
+	api/                # Route handlers
 
+components/
+	auth/               # Auth forms
+	farmerDashboard/    # Farmer dashboard UI blocks
+	soilAgent/          # Soil agent dashboard components
+	soilTestingRegistration/
+	common/
+	ui/
 
----
+context/              # React context providers and state containers
+lib/                  # Shared utilities and clients
+models/               # Data model definitions
+```
 
-## 📜 License
+## Deployment
 
-This project is licensed under the [MIT License](LICENSE).
+1. Set the same environment variables in your hosting provider.
+2. Run `npm run build` to verify the app builds.
+3. Deploy using a Next.js-compatible platform (for example, Vercel).
 
----
+## Contributing
 
-> Made with ❤️ for the farmers of the world 🌍
+1. Create a branch: `git checkout -b feature/your-feature`
+2. Commit your changes: `git commit -m "feat: add your feature"`
+3. Push and open a pull request
+
+## License
+
+This project is licensed under the MIT License.

@@ -12,7 +12,7 @@ export class AudioStreamer {
   private scheduledTime: number = 0;
   public gainNode: GainNode;
   public source: AudioBufferSourceNode;
-  private isStreamComplete: boolean = false;
+  public isStreamComplete: boolean = false;
   private checkInterval: number | null = null;
   private initialBufferTime: number = 0.1; //0.1 // 100ms initial buffer
   private endOfQueueAudioSource: AudioBufferSourceNode | null = null;
@@ -220,6 +220,9 @@ export class AudioStreamer {
       await this.context.resume();
     }
     this.isStreamComplete = false;
+    this.isPlaying = false;
+    this.audioQueue = [];
+    this.processingBuffer = new Float32Array(0);
     this.scheduledTime = this.context.currentTime + this.initialBufferTime;
     this.gainNode.gain.setValueAtTime(1, this.context.currentTime);
   }

@@ -197,11 +197,12 @@ export class MultimodalLiveClient extends EventEmitter<MultimodalLiveClientEvent
       if (isTurnComplete(serverContent)) {
         this.log("server.send", "turnComplete");
         this.emit("turncomplete");
-        //plausible theres more to the message, continue
       }
 
       if (isModelTurn(serverContent)) {
-        let parts: Part[] = serverContent.modelTurn.parts;
+        let parts: Part[] = serverContent.modelTurn.parts.filter(
+          (p: any) => !p.thought
+        );
 
         const audioParts = parts.filter(
           (p) => p.inlineData && p.inlineData.mimeType.startsWith("audio/pcm")
@@ -307,7 +308,42 @@ export class MultimodalLiveClient extends EventEmitter<MultimodalLiveClientEvent
     if (!this.ws) {
       throw new Error("WebSocket is not connected");
     }
-    const str = JSON.stringify(request);
-    this.ws.send(str);
+    const str = JSON.stringify(request, (key, value) => {
+      if (key === "responseModalities") return undefined;
+      if (key === "speechConfig") return undefined;
+      if (key === "voiceConfig") return undefined;
+      if (key === "prebuiltVoiceConfig") return undefined;
+      if (key === "voiceName") return undefined;
+      if (key === "systemInstruction") return undefined;
+      return value;
+    });
+
+    // build snake_case setup manually
+    const obj = request as any;
+    if (obj.setup) {
+      const cfg = obj.setup.generationConfig || {};
+      const snakeSetup: any = {
+        setup: {
+          model: obj.setup.model,
+          generation_config: {
+            response_modalities: cfg.responseModalities || ["AUDIO"],
+            speech_config: {
+              voice_config: {
+                prebuilt_voice_config: {
+                  voice_name: cfg.speechConfig?.voiceConfig?.prebuiltVoiceConfig?.voiceName || "Aoede",
+                },
+              },
+            },
+            thinking_config: { thinking_budget: 0 },
+          },
+        },
+      };
+      if (obj.setup.systemInstruction) {
+        snakeSetup.setup.system_instruction = obj.setup.systemInstruction;
+      }
+      this.ws.send(JSON.stringify(snakeSetup));
+      return;
+    }
+    this.ws.send(JSON.stringify(request));
   }
 }

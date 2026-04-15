@@ -97,7 +97,7 @@ function ControlTray({
   const recognitionRef = useRef<any>(null);
   const finalTranscriptRef = useRef("");
 
-  const { client, connected, connect, disconnect, volume, clearLatestResponse } =
+  const { client, connected, connect, disconnect, volume, clearLatestResponse, sendTextAndGetResponse } =
     useLiveAPIContext();
 
   // Note: removed auto-focus on connectButton to prevent stealing focus from form inputs on other pages
@@ -196,10 +196,7 @@ function ControlTray({
   };
 
   const startRecording = async () => {
-    if (!connected) {
-      await connect();
-    }
-
+    await connect();
     setElapsedSeconds(0);
     finalTranscriptRef.current = "";
     onUserTranscriptChange?.("", false);
@@ -214,12 +211,11 @@ function ControlTray({
       const recognition = new SpeechRecognitionCtor();
       recognition.continuous = true;
       recognition.interimResults = true;
-      recognition.lang = navigator.language || "en-US";
+      recognition.lang = "";
 
       recognition.onresult = (event: any) => {
         let interim = "";
         let finalText = finalTranscriptRef.current;
-
         for (let i = event.resultIndex; i < event.results.length; i++) {
           const transcript = event.results[i][0]?.transcript || "";
           if (event.results[i].isFinal) {
@@ -228,10 +224,8 @@ function ControlTray({
             interim += transcript;
           }
         }
-
         finalTranscriptRef.current = finalText;
-        const merged = `${finalText} ${interim}`.trim();
-        onUserTranscriptChange?.(merged, false);
+        onUserTranscriptChange?.(`${finalText} ${interim}`.trim(), false);
       };
 
       recognition.onerror = (event: any) => {
@@ -239,11 +233,7 @@ function ControlTray({
       };
 
       recognitionRef.current = recognition;
-      try {
-        recognition.start();
-      } catch (error) {
-        console.error("Failed to start speech recognition:", error);
-      }
+      try { recognition.start(); } catch (e) {}
     }
 
     setIsRecording(true);
@@ -254,26 +244,15 @@ function ControlTray({
     audioRecorder.stop();
     const recognition = recognitionRef.current;
     if (recognition) {
-      try {
-        recognition.stop();
-      } catch (error) {
-        console.error("Failed to stop speech recognition:", error);
-      }
+      try { recognition.stop(); } catch (e) {}
     }
 
-    onUserTranscriptChange?.(finalTranscriptRef.current.trim(), true);
+    const transcript = finalTranscriptRef.current.trim();
+    onUserTranscriptChange?.(transcript, true);
 
-    if (connected) {
-      try {
-        clearLatestResponse();
-        client.send({
-          text:
-            "The farmer has finished speaking. Please answer in the same language as the recording.",
-        });
-      } catch (error) {
-        console.error("Failed to submit recording:", error);
-      }
-    }
+    if (!transcript) return;
+
+    sendTextAndGetResponse(transcript);
   };
 
   return (

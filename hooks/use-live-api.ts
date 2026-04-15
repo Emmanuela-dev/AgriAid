@@ -19,6 +19,7 @@ export type UseLiveAPIResults = {
   latestResponse: string;
   isResponding: boolean;
   clearLatestResponse: () => void;
+  sendTextAndGetResponse: (text: string) => Promise<void>;
 };
 
 export function useLiveAPI({
@@ -35,9 +36,9 @@ export function useLiveAPI({
   const [latestResponse, setLatestResponse] = useState("");
   const [isResponding, setIsResponding] = useState(false);
   const [config, setConfig] = useState<LiveConfig>({
-    model: "models/gemini-2.0-flash-live-001",
+    model: "models/gemini-2.5-flash-native-audio-latest",
     generationConfig: {
-      responseModalities: ["AUDIO", "TEXT"],
+      responseModalities: ["AUDIO"] as any,
       speechConfig: {
         voiceConfig: {
           prebuiltVoiceConfig: {
@@ -45,23 +46,15 @@ export function useLiveAPI({
           },
         },
       },
-    },
+      thinkingConfig: { thinkingBudget: 0 },
+    } as any,
     systemInstruction: {
       parts: [
         {
-          text: `You are AgriAid, a powerful, professional, and friendly multilingual agricultural assistant. 
-          Your mission is to empower farmers worldwide with real-time, accurate, and actionable agricultural advice.
-          
-          Key Capabilities:
-          1. Multilingual Communication: You MUST detect the user's language automatically and respond fluently in that same language. Supported languages include English, Swahili, French, Spanish, Hindi, Odia, and any other regional dialects.
-          2. Expert Advice: Provide information on weather forecasts, crop recommendations, soil health, market prices, and government schemes.
-          3. Accessibility: Use simple, clear language that is easy for farmers (including those who are semi-literate) to understand.
-          4. Empathy: Be encouraging and supportive of the challenges farmers face.
-          
-          Always start by greeting the user and asking how you can help them with their farming today. If they speak in a specific language, switch to that language immediately.`
-        }
-      ]
-    }
+          text: `You are AgriAid, a farming assistant for Kenyan farmers. Be direct and concise. No thinking out loud, no meta-commentary, no "I am analyzing" phrases. Just answer the question immediately and clearly. Give practical bullet points when listing steps. You know all 47 Kenyan counties, their climates, soils, and suitable crops. Detect the farmer's language and respond in that same language. Supported languages include English, Kiswahili, Kikuyu, Luo, Luhya, Kamba, Kalenjin, Meru, Mijikenda, Somali, Maasai, Turkana, Kisii, and any other Kenyan language or dialect — always match whatever language the farmer speaks.`,
+        },
+      ],
+    },
   });
   const [volume, setVolume] = useState(0);
 
@@ -89,35 +82,46 @@ export function useLiveAPI({
 
     const stopAudioStreamer = () => audioStreamerRef.current?.stop();
 
-    const onAudio = (data: ArrayBuffer) =>
-      audioStreamerRef.current?.addPCM16(new Uint8Array(data));
+    const onAudio = async (data: ArrayBuffer) => {
+      const streamer = audioStreamerRef.current;
+      if (!streamer) return;
+      if (streamer.context.state === "suspended") {
+        await streamer.context.resume();
+      }
+      streamer.isStreamComplete = false;
+      streamer.addPCM16(new Uint8Array(data));
+      setIsResponding(true);
+    };
 
-    const onContent = (data: { modelTurn?: { parts?: Array<{ text?: string }> } }) => {
+    const onContent = (data: any) => {
+      // capture text from regular parts
       const parts = data.modelTurn?.parts || [];
-      const text = parts
-        .map((part) => part.text || "")
-        .join("")
-        .trim();
-
+      const text = parts.map((p: any) => p.text || "").join("").trim();
       if (text) {
-        setLatestResponse((current) => {
-          if (!current) {
-            return text;
-          }
-
-          return `${current}\n${text}`;
-        });
-        setIsResponding(true);
+        setLatestResponse((current) => current ? `${current} ${text}` : text);
+      }
+      // capture output audio transcription
+      const transcript = data.outputTranscription?.text || data.serverContent?.outputTranscription?.text || "";
+      if (transcript) {
+        setLatestResponse((current) => current ? `${current} ${transcript}` : transcript);
       }
     };
 
     const onTurnComplete = () => {
+      setTimeout(() => {
+        audioStreamerRef.current?.complete();
+      }, 500);
+      setIsResponding(false);
+    };
+
+    const onInterrupted = () => {
+      audioStreamerRef.current?.stop();
       setIsResponding(false);
     };
 
     client
       .on("close", onClose)
-      .on("interrupted", stopAudioStreamer)
+      .on("interrupted", onInterrupted)
       .on("audio", onAudio)
       .on("content", onContent as never)
       .on("turncomplete", onTurnComplete);
@@ -125,7 +129,7 @@ export function useLiveAPI({
     return () => {
       client
         .off("close", onClose)
-        .off("interrupted", stopAudioStreamer)
+        .off("interrupted", onInterrupted)
         .off("audio", onAudio)
         .off("content", onContent as never)
         .off("turncomplete", onTurnComplete);
@@ -150,6 +154,61 @@ export function useLiveAPI({
     setLatestResponse("");
   }, []);
 
+  const sendTextAndGetResponse = useCallback(async (text: string) => {
+    setLatestResponse("");
+    setIsResponding(true);
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            system_instruction: {
+              parts: [{ text: `You are AgriAid, a farming assistant for Kenyan farmers. Be direct and concise. No meta-commentary. Give practical bullet points. You know all 47 Kenyan counties, their climates, soils, and suitable crops. Detect the farmer's language and respond in that same language. Supported languages include English, Kiswahili, Kikuyu, Luo, Luhya, Kamba, Kalenjin, Meru, Mijikenda, Somali, Maasai, Turkana, Kisii, and any other Kenyan language.` }],
+            },
+            contents: [{ role: "user", parts: [{ text }] }],
+          }),
+        }
+      );
+      const data = await res.json();
+      const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      setLatestResponse(responseText);
+
+      // play audio via TTS
+      if (responseText && audioStreamerRef.current) {
+        const ttsRes = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: responseText }] }],
+              generationConfig: {
+                responseModalities: ["AUDIO"],
+                speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } } },
+              },
+            }),
+          }
+        );
+        const ttsData = await ttsRes.json();
+        const audioB64 = ttsData.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+        if (audioB64 && audioStreamerRef.current) {
+          const streamer = audioStreamerRef.current;
+          if (streamer.context.state === "suspended") await streamer.context.resume();
+          streamer.isStreamComplete = false;
+          const bytes = Uint8Array.from(atob(audioB64), c => c.charCodeAt(0));
+          streamer.addPCM16(bytes);
+          setTimeout(() => streamer.complete(), 500);
+        }
+      }
+    } catch (e) {
+      console.error("Response error:", e);
+    } finally {
+      setIsResponding(false);
+    }
+  }, [apiKey]);
+
   return {
     client,
     config,
@@ -161,5 +220,6 @@ export function useLiveAPI({
     latestResponse,
     isResponding,
     clearLatestResponse,
+    sendTextAndGetResponse,
   };
 }

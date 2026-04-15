@@ -49,29 +49,43 @@ function VoiceChatSurface({
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
   const saveRecommendationDocument = (content: string) => {
-    if (!content.trim()) {
-      return;
-    }
+    if (!content.trim()) return;
+    import("jspdf").then(({ jsPDF }) => {
+      const doc = new jsPDF({ unit: "mm", format: "a4" });
+      const margin = 15;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const maxWidth = pageWidth - margin * 2;
 
-    const documentText = [
-      "AgriAid AI Recommendation",
-      `Generated: ${new Date().toLocaleString()}`,
-      "",
-      content,
-      "",
-      "---",
-      "This document was generated automatically from the farmer's voice request.",
-    ].join("\n");
+      // header
+      doc.setFillColor(34, 197, 94);
+      doc.rect(0, 0, pageWidth, 22, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.text("AgriAid Recommendation", margin, 14);
 
-    const blob = new Blob([documentText], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `agriaid-recommendation-${formatTimestamp()}.txt`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setTimeout(() => URL.revokeObjectURL(url), 0);
+      // date
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.text(new Date().toLocaleString(), pageWidth - margin, 14, { align: "right" });
+
+      // body
+      doc.setTextColor(30, 30, 30);
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "normal");
+      const lines = doc.splitTextToSize(content, maxWidth);
+      let y = 32;
+      lines.forEach((line: string) => {
+        if (y > doc.internal.pageSize.getHeight() - margin) {
+          doc.addPage();
+          y = margin;
+        }
+        doc.text(line, margin, y);
+        y += 6;
+      });
+
+      doc.save(`agriaid-recommendation-${formatTimestamp()}.pdf`);
+    });
   };
 
   useEffect(() => {
@@ -132,9 +146,7 @@ function VoiceChatSurface({
   };
 
   useEffect(() => {
-    if (!latestResponse) {
-      return;
-    }
+    if (!latestResponse) return;
 
     setMessages((current) => {
       if (!assistantMessageIdRef.current) {
@@ -151,7 +163,6 @@ function VoiceChatSurface({
           },
         ];
       }
-
       return current.map((message) =>
         message.id === assistantMessageIdRef.current
           ? { ...message, text: latestResponse, pending: isResponding }
@@ -164,6 +175,18 @@ function VoiceChatSurface({
       lastDownloadedRef.current = latestResponse;
     }
   }, [latestResponse, isResponding]);
+
+  // mark assistant message done when turn completes even if no text came
+  useEffect(() => {
+    if (!isResponding && assistantMessageIdRef.current) {
+      setMessages((current) =>
+        current.map((m) =>
+          m.id === assistantMessageIdRef.current ? { ...m, pending: false } : m
+        )
+      );
+      assistantMessageIdRef.current = null;
+    }
+  }, [isResponding]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -195,7 +218,7 @@ function VoiceChatSurface({
               <p className="text-[11px] font-semibold uppercase opacity-70 mb-1">
                 {message.role === "farmer" ? "Farmer" : "AgriAid"}
               </p>
-              {message.text || (message.pending ? "Typing response..." : "")}
+              {message.text || (message.pending ? "🔊 AgriAid is speaking..." : "✓ Response delivered via voice")}
               <p className="text-[10px] opacity-60 mt-2 text-right">
                 {formatTime(message.createdAt)}
               </p>
@@ -220,7 +243,7 @@ function VoiceChatSurface({
         </div>
 
         <div className="mt-4 flex items-center justify-between gap-3 flex-wrap">
-          <p className="text-xs text-gray-500">Latest recommendation is auto-saved as a text document.</p>
+          <p className="text-xs text-gray-500">Latest recommendation is auto-saved as a PDF.</p>
           <button
             type="button"
             onClick={() => {
