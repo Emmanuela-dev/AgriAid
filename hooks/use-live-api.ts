@@ -29,11 +29,16 @@ export function useLiveAPI({
   url,
   apiKey,
 }: MultimodalLiveAPIClientConnection): UseLiveAPIResults {
+  const refusalMessage =
+    "Sorry, but AgriAid only provides agricultural solutions only. Please ask your agriculture question.";
   const client = useMemo(
     () => new MultimodalLiveClient({ url, apiKey }),
     [url, apiKey],
   );
   const audioStreamerRef = useRef<AudioStreamer | null>(null);
+  const reconnectTimerRef = useRef<number | null>(null);
+  const isConnectingRef = useRef(false);
+  const shouldReconnectRef = useRef(false);
 
   const [connected, setConnected] = useState(false);
   const [latestResponse, setLatestResponse] = useState("");
@@ -58,12 +63,24 @@ export function useLiveAPI({
     systemInstruction: {
       parts: [
         {
-          text: `You are AgriAid, a farming assistant for Kenyan farmers. Be direct and concise. No thinking out loud, no meta-commentary, no "I am analyzing" phrases. Just answer the question immediately and clearly. Give practical bullet points when listing steps. You know all 47 Kenyan counties, their climates, soils, and suitable crops. Detect the farmer's language and respond in that same language. When speaking audio, use authentic local pronunciation, rhythm, and intonation of the detected language. For Luo (Dholuo), pronounce words using native Dholuo phonology and avoid English-like pronunciation. For Kikuyu (Gikuyu), use natural Gikuyu pronunciation and tone patterns. For Kisii (Ekegusii), use Ekegusii pronunciation without anglicizing vowels or consonants. For Kalenjin, use natural Kalenjin pronunciation and cadence. For Luhya/Luya, use natural Luhya pronunciation and cadence. Supported languages include English, Kiswahili, Kikuyu, Luo, Luhya, Luya, Kamba, Kalenjin, Meru, Mijikenda, Somali, Maasai, Turkana, Kisii, and any other Kenyan language or dialect - always match whatever language the farmer speaks.`,
+          text: `You are AgriAid, a farming assistant for Kenyan farmers. Be direct and concise. No thinking out loud, no meta-commentary, no "I am analyzing" phrases. Just answer the question immediately and clearly. Give practical bullet points when listing steps. You know all 47 Kenyan counties, their climates, soils, and suitable crops. Only respond to agricultural, farming, livestock, crop, soil, weather-for-farming, pest, fertilizer, irrigation, and Kenyan agriculture questions. If the user asks anything outside agriculture, refuse politely with: "Sorry, but AgriAid only provides agricultural solutions only. Please ask your agriculture question." Detect the farmer's language and respond in that same language. When speaking audio, use authentic local pronunciation, rhythm, and intonation of the detected language. For Luo (Dholuo), pronounce words using native Dholuo phonology and avoid English-like pronunciation. For Kikuyu (Gikuyu), use natural Gikuyu pronunciation and tone patterns. For Kisii (Ekegusii), use Ekegusii pronunciation without anglicizing vowels or consonants. For Kalenjin, use natural Kalenjin pronunciation and cadence. For Luhya/Luya, use natural Luhya pronunciation and cadence. Supported languages include English, Kiswahili, Kikuyu, Luo, Luhya, Luya, Kamba, Kalenjin, Meru, Mijikenda, Somali, Maasai, Turkana, Kisii, and any other Kenyan language or dialect - always match whatever language the farmer speaks.`,
         },
       ],
     },
   });
+  const configRef = useRef(config);
   const [volume, setVolume] = useState(0);
+
+  useEffect(() => {
+    configRef.current = config;
+  }, [config]);
+
+  const clearReconnectTimer = useCallback(() => {
+    if (reconnectTimerRef.current) {
+      window.clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+  }, []);
 
   const detectLanguageFromText = useCallback(
     async (text: string) => {
@@ -136,6 +153,101 @@ export function useLiveAPI({
     [apiKey],
   );
 
+  const isAgriculturalQuestion = useCallback(
+    async (text: string) => {
+      const agriculturalKeywords = /\b(farm|farming|farmer|crop|crops|soil|soils|seed|seeds|plant|planting|grow|growing|harvest|harvesting|fertilizer|manure|pest|pests|disease|diseases|irrigation|livestock|cattle|goat|goats|sheep|poultry|chicken|maize|beans|tea|coffee|banana|bananas|avocado|avocados|tomato|tomatoes|kale|sukuma|spinach|weather|rain|rainfall|county|yield|spray|spraying|greenhouse)\b/i;
+
+      if (agriculturalKeywords.test(text)) {
+        return true;
+      }
+
+      try {
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              generationConfig: {
+                responseMimeType: "application/json",
+              },
+              contents: [
+                {
+                  role: "user",
+                  parts: [
+                    {
+                      text: `Classify whether this user message is an agricultural question. Return strict JSON only with keys: agricultural, confidence. agricultural must be true only for farming, crops, soil, livestock, pests, fertilizer, irrigation, weather-for-farming, or other Kenyan agriculture topics. Text: ${text}`,
+                    },
+                  ],
+                },
+              ],
+            }),
+          },
+        );
+
+        const data = await res.json();
+        const raw = (data.candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
+        if (!raw) return false;
+
+        let parsed: any = null;
+        try {
+          parsed = JSON.parse(raw);
+        } catch {
+          const fencedMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+          const candidate = fencedMatch?.[1]?.trim() || raw;
+          try {
+            parsed = JSON.parse(candidate);
+          } catch {
+            parsed = null;
+          }
+        }
+
+        return Boolean(parsed?.agricultural);
+      } catch (error) {
+        console.error("Agriculture classification error:", error);
+        return false;
+      }
+    },
+    [apiKey],
+  );
+
+  const speakTextViaTTS = useCallback(
+    async (text: string, voiceName: string = "Aoede") => {
+      if (!audioStreamerRef.current || !text.trim()) return;
+
+      const ttsRes = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text }] }],
+            generationConfig: {
+              responseModalities: ["AUDIO"],
+              speechConfig: {
+                voiceConfig: { prebuiltVoiceConfig: { voiceName } },
+              },
+            },
+          }),
+        },
+      );
+
+      const ttsData = await ttsRes.json();
+      const audioB64 = ttsData.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      if (!audioB64 || !audioStreamerRef.current) return;
+
+      const streamer = audioStreamerRef.current;
+      if (streamer.context.state === "suspended") {
+        await streamer.context.resume();
+      }
+      streamer.isStreamComplete = false;
+      const bytes = Uint8Array.from(atob(audioB64), (c) => c.charCodeAt(0));
+      streamer.addPCM16(bytes);
+      setTimeout(() => streamer.complete(), 500);
+    },
+    [apiKey],
+  );
+
   // register audio for streaming server -> speakers
   useEffect(() => {
     if (!audioStreamerRef.current) {
@@ -156,6 +268,27 @@ export function useLiveAPI({
     const onClose = () => {
       setConnected(false);
       setIsResponding(false);
+
+      if (!shouldReconnectRef.current) {
+        return;
+      }
+
+      clearReconnectTimer();
+      reconnectTimerRef.current = window.setTimeout(async () => {
+        if (isConnectingRef.current || !shouldReconnectRef.current) {
+          return;
+        }
+
+        try {
+          isConnectingRef.current = true;
+          await client.connect(configRef.current);
+          setConnected(true);
+        } catch (error) {
+          console.error("Reconnect failed:", error);
+        } finally {
+          isConnectingRef.current = false;
+        }
+      }, 1000);
     };
 
     const onAudio = async (data: ArrayBuffer) => {
@@ -219,6 +352,7 @@ export function useLiveAPI({
       .on("turncomplete", onTurnComplete);
 
     return () => {
+      clearReconnectTimer();
       client
         .off("close", onClose)
         .off("interrupted", onInterrupted)
@@ -226,34 +360,40 @@ export function useLiveAPI({
         .off("content", onContent as never)
         .off("turncomplete", onTurnComplete);
     };
-  }, [client]);
+  }, [client, clearReconnectTimer]);
 
-  useEffect(() => {
-    if (!latestUserTranscript.trim()) {
-      setDetectedInputLanguage("Auto");
+  const connect = useCallback(async () => {
+    if (!configRef.current) {
+      throw new Error("config has not been set");
+    }
+
+    shouldReconnectRef.current = true;
+    clearReconnectTimer();
+
+    if (isConnectingRef.current) {
       return;
     }
 
-    const timeoutId = window.setTimeout(() => {
-      detectLanguageFromText(latestUserTranscript);
-    }, 350);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [latestUserTranscript, detectLanguageFromText]);
-
-  const connect = useCallback(async () => {
-    if (!config) {
-      throw new Error("config has not been set");
+    if (client.ws?.readyState === WebSocket.OPEN) {
+      setConnected(true);
+      return;
     }
-    client.disconnect();
-    await client.connect(config);
-    setConnected(true);
-  }, [client, setConnected, config]);
+
+    isConnectingRef.current = true;
+    try {
+      await client.connect(configRef.current);
+      setConnected(true);
+    } finally {
+      isConnectingRef.current = false;
+    }
+  }, [client, clearReconnectTimer, setConnected]);
 
   const disconnect = useCallback(async () => {
+    shouldReconnectRef.current = false;
+    clearReconnectTimer();
     client.disconnect();
     setConnected(false);
-  }, [setConnected, client]);
+  }, [clearReconnectTimer, setConnected, client]);
 
   const clearLatestResponse = useCallback(() => {
     setLatestResponse("");
@@ -269,6 +409,13 @@ export function useLiveAPI({
       setLatestResponse("");
       setIsResponding(true);
       try {
+        const agricultural = await isAgriculturalQuestion(text);
+        if (!agricultural) {
+          setLatestResponse(refusalMessage);
+          await speakTextViaTTS(refusalMessage);
+          return;
+        }
+
         const resolvedLanguage =
           preferredLanguage && preferredLanguage.trim().length > 0
             ? preferredLanguage
@@ -281,14 +428,21 @@ export function useLiveAPI({
           setDetectedInputLanguage(resolvedLanguage);
         }
 
-        if (connected) {
-          client.send(
-            {
-              text: `Respond only in ${resolvedLanguage}. When speaking, use authentic native ${resolvedLanguage} accent and pronunciation used by local Kenyan speakers. Do not anglicize pronunciations. Farmer question: ${text}`,
-            },
-            true,
-          );
-          return;
+        const liveSocketReady =
+          connected && client.ws?.readyState === WebSocket.OPEN;
+
+        if (liveSocketReady) {
+          try {
+            client.send(
+              {
+                text: `Respond only in ${resolvedLanguage}. When speaking, use authentic native ${resolvedLanguage} accent and pronunciation used by local Kenyan speakers. Do not anglicize pronunciations. Farmer question: ${text}`,
+              },
+              true,
+            );
+            return;
+          } catch (liveSendError) {
+            console.error("Live send failed, using fallback:", liveSendError);
+          }
         }
 
         const res = await fetch(
@@ -312,36 +466,8 @@ export function useLiveAPI({
         const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
         setLatestResponse(responseText);
 
-        if (responseText && audioStreamerRef.current) {
-          const ttsRes = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                contents: [{ parts: [{ text: responseText }] }],
-                generationConfig: {
-                  responseModalities: ["AUDIO"],
-                  speechConfig: {
-                    voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } },
-                  },
-                },
-              }),
-            },
-          );
-          const ttsData = await ttsRes.json();
-          const audioB64 =
-            ttsData.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-          if (audioB64 && audioStreamerRef.current) {
-            const streamer = audioStreamerRef.current;
-            if (streamer.context.state === "suspended") {
-              await streamer.context.resume();
-            }
-            streamer.isStreamComplete = false;
-            const bytes = Uint8Array.from(atob(audioB64), (c) => c.charCodeAt(0));
-            streamer.addPCM16(bytes);
-            setTimeout(() => streamer.complete(), 500);
-          }
+        if (responseText) {
+          await speakTextViaTTS(responseText);
         }
       } catch (e) {
         console.error("Response error:", e);
@@ -349,7 +475,7 @@ export function useLiveAPI({
         setIsResponding(false);
       }
     },
-    [apiKey, client, connected, detectLanguageFromText],
+    [client, connected, detectLanguageFromText, isAgriculturalQuestion, speakTextViaTTS],
   );
 
   return {
