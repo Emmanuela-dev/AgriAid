@@ -95,6 +95,12 @@ function ControlTray({
   const renderCanvasRef = useRef<HTMLCanvasElement>(null);
   const connectButtonRef = useRef<HTMLButtonElement>(null);
   const elapsedTimerRef = useRef<number | null>(null);
+  const transcriptCallbackRef = useRef(onUserTranscriptChange);
+  const lastTranscriptRef = useRef("");
+
+  useEffect(() => {
+    transcriptCallbackRef.current = onUserTranscriptChange;
+  }, [onUserTranscriptChange]);
 
   const {
     client,
@@ -120,10 +126,12 @@ function ControlTray({
   }, [inVolume]);
 
   useEffect(() => {
-    if (isRecording) {
-      onUserTranscriptChange?.(latestUserTranscript, false);
-    }
-  }, [isRecording, latestUserTranscript, onUserTranscriptChange]);
+    if (!isRecording) return;
+    if (latestUserTranscript === lastTranscriptRef.current) return;
+
+    lastTranscriptRef.current = latestUserTranscript;
+    transcriptCallbackRef.current?.(latestUserTranscript, false);
+  }, [isRecording, latestUserTranscript]);
 
   useEffect(() => {
     if (!isRecording) {
@@ -215,6 +223,7 @@ function ControlTray({
     await connect();
     setElapsedSeconds(0);
     clearLatestUserTranscript();
+    lastTranscriptRef.current = "";
     onUserTranscriptChange?.("", false);
 
     setIsRecording(true);
@@ -225,6 +234,7 @@ function ControlTray({
     audioRecorder.stop();
 
     const transcript = latestUserTranscript.trim();
+    lastTranscriptRef.current = transcript;
     onUserTranscriptChange?.(transcript, true);
 
     if (!transcript) return;
