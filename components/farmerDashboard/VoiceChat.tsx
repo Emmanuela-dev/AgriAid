@@ -44,6 +44,7 @@ function VoiceChatSurface({
   const { latestResponse, isResponding } = useLiveAPIContext();
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [liveTranscript, setLiveTranscript] = useState("");
+  const [minimized, setMinimized] = useState(false);
   const assistantMessageIdRef = useRef<string | null>(null);
   const lastDownloadedRef = useRef("");
   const chatEndRef = useRef<HTMLDivElement | null>(null);
@@ -195,93 +196,99 @@ function VoiceChatSurface({
   return (
     <div className="fixed left-4 right-4 bottom-4 z-50">
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.5fr)_minmax(340px,0.9fr)] gap-4 items-end">
-      <div className="bg-white/95 backdrop-blur rounded-2xl border border-green-100 shadow-xl p-4 sm:p-5 h-[44vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-semibold text-gray-900">
-            AgriAid Voice Conversation
-          </h3>
-          <span className="text-xs px-2 py-1 rounded-full border border-green-200 bg-green-50 text-green-700">
-            {isResponding ? "Real-time Voice + Text" : "Ready"}
-          </span>
-        </div>
 
-        <div className="space-y-3">
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={`max-w-[92%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap ${
-                message.role === "farmer"
-                  ? "ml-auto bg-blue-50 text-blue-900 border border-blue-100"
-                  : "mr-auto bg-green-50 text-green-900 border border-green-100"
-              }`}
-            >
-              <p className="text-[11px] font-semibold uppercase opacity-70 mb-1">
-                {message.role === "farmer" ? "Farmer" : "AgriAid"}
-              </p>
-              {message.text || (message.pending ? "🔊 AgriAid is speaking..." : "✓ Response delivered via voice")}
-              <p className="text-[10px] opacity-60 mt-2 text-right">
-                {formatTime(message.createdAt)}
-              </p>
-            </div>
-          ))}
-
-          {liveTranscript && (
-            <div className="ml-auto max-w-[92%] rounded-xl px-3 py-2 text-sm bg-blue-50/70 text-blue-900 border border-blue-100 border-dashed whitespace-pre-wrap">
-              <p className="text-[11px] font-semibold uppercase opacity-70 mb-1">
-                Farmer (Speaking)
-              </p>
-              {liveTranscript}
-            </div>
-          )}
-
-          {!messages.length && !liveTranscript && (
-            <p className="text-xs text-gray-500">
-              Start recording and speak. Your words and AgriAid recommendations will appear here.
-            </p>
-          )}
-          <div ref={chatEndRef} />
-        </div>
-
-        <div className="mt-4 flex items-center justify-between gap-3 flex-wrap">
-          <p className="text-xs text-gray-500">Latest recommendation is auto-saved as a PDF.</p>
-          <button
-            type="button"
-            onClick={() => {
-              if (latestResponse) {
-                saveRecommendationDocument(latestResponse);
-              }
-            }}
-            disabled={!latestResponse}
-            className="px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-colors"
+        {/* Chat panel */}
+        <div className="bg-white/95 backdrop-blur rounded-2xl border border-green-100 shadow-xl">
+          {/* Header — always visible */}
+          <div
+            className="flex items-center justify-between px-4 py-3 cursor-pointer select-none"
+            onClick={() => setMinimized((v) => !v)}
           >
-            Download Document
-          </button>
-        </div>
-      </div>
+            <h3 className="text-sm font-semibold text-gray-900">AgriAid Voice Conversation</h3>
+            <div className="flex items-center gap-2">
+              <span className="text-xs px-2 py-1 rounded-full border border-green-200 bg-green-50 text-green-700">
+                {isResponding ? "Responding..." : "Ready"}
+              </span>
+              <span className="text-gray-400 text-lg leading-none">{minimized ? "▲" : "▼"}</span>
+            </div>
+          </div>
 
-      <ControlTray
-        videoRef={videoRef}
-        supportsVideo={true}
-        onVideoStreamChange={setVideoStream}
-        onUserTranscriptChange={handleUserTranscriptChange}
-        containerClassName="
-          bg-gray-900/90
-          backdrop-blur-xl
-          rounded-2xl
-          shadow-2xl
-          border
-          border-gray-800/50
-          p-4
-          w-full
-          flex
-          flex-col
-          items-center
-          space-y-4
-          ring-1
-          ring-white/10
-          h-fit
-        "
-      ></ControlTray>
+          {/* Collapsible body */}
+          {!minimized && (
+            <div className="px-4 pb-4">
+              <div className="h-[38vh] overflow-y-auto space-y-3 mb-3">
+                {messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`max-w-[92%] rounded-xl px-3 py-2 text-sm whitespace-pre-wrap ${
+                      message.role === "farmer"
+                        ? "ml-auto bg-blue-50 text-blue-900 border border-blue-100"
+                        : "mr-auto bg-green-50 text-green-900 border border-green-100"
+                    }`}
+                  >
+                    <p className="text-[11px] font-semibold uppercase opacity-70 mb-1">
+                      {message.role === "farmer" ? "Farmer" : "AgriAid"}
+                    </p>
+                    {message.text || (message.pending ? "🔊 AgriAid is speaking..." : "✓ Response delivered via voice")}
+                    <p className="text-[10px] opacity-60 mt-2 text-right">
+                      {formatTime(message.createdAt)}
+                    </p>
+                  </div>
+                ))}
+
+                {liveTranscript && (
+                  <div className="ml-auto max-w-[92%] rounded-xl px-3 py-2 text-sm bg-blue-50/70 text-blue-900 border border-blue-100 border-dashed whitespace-pre-wrap">
+                    <p className="text-[11px] font-semibold uppercase opacity-70 mb-1">Farmer (Speaking)</p>
+                    {liveTranscript}
+                  </div>
+                )}
+
+                {!messages.length && !liveTranscript && (
+                  <p className="text-xs text-gray-500">
+                    Start recording and speak. Your words and AgriAid recommendations will appear here.
+                  </p>
+                )}
+                <div ref={chatEndRef} />
+              </div>
+
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <p className="text-xs text-gray-500">Latest recommendation is auto-saved as a PDF.</p>
+                <button
+                  type="button"
+                  onClick={() => latestResponse && saveRecommendationDocument(latestResponse)}
+                  disabled={!latestResponse}
+                  className="px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
+                >
+                  Download Document
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <ControlTray
+          videoRef={videoRef}
+          supportsVideo={true}
+          onVideoStreamChange={setVideoStream}
+          onUserTranscriptChange={handleUserTranscriptChange}
+          containerClassName="
+            bg-gray-900/90
+            backdrop-blur-xl
+            rounded-2xl
+            shadow-2xl
+            border
+            border-gray-800/50
+            p-4
+            w-full
+            flex
+            flex-col
+            items-center
+            space-y-4
+            ring-1
+            ring-white/10
+            h-fit
+          "
+        />
       </div>
     </div>
   );

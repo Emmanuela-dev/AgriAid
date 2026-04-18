@@ -199,6 +199,16 @@ export class MultimodalLiveClient extends EventEmitter<MultimodalLiveClientEvent
         this.emit("turncomplete");
       }
 
+      const hasTranscription =
+        (serverContent as any).inputTranscription ||
+        (serverContent as any).input_transcription ||
+        (serverContent as any).outputTranscription ||
+        (serverContent as any).output_transcription;
+      if (hasTranscription && !isModelTurn(serverContent)) {
+        this.emit("content", serverContent as any);
+        this.log("server.content", response);
+      }
+
       if (isModelTurn(serverContent)) {
         let parts: Part[] = serverContent.modelTurn.parts.filter(
           (p: any) => !p.thought
@@ -224,7 +234,10 @@ export class MultimodalLiveClient extends EventEmitter<MultimodalLiveClientEvent
 
         parts = otherParts;
 
-        const content: ModelTurn = { modelTurn: { parts } };
+        const content: any = {
+          ...(serverContent as any),
+          modelTurn: { parts },
+        };
         this.emit("content", content);
         this.log(`server.content`, response);
       }
@@ -325,6 +338,8 @@ export class MultimodalLiveClient extends EventEmitter<MultimodalLiveClientEvent
       const snakeSetup: any = {
         setup: {
           model: obj.setup.model,
+          input_audio_transcription: obj.setup.inputAudioTranscription || {},
+          output_audio_transcription: obj.setup.outputAudioTranscription || {},
           generation_config: {
             response_modalities: cfg.responseModalities || ["AUDIO"],
             speech_config: {

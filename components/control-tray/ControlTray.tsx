@@ -90,14 +90,24 @@ function ControlTray({
   const [audioRecorder] = useState(() => new AudioRecorder());
   const [muted, setMuted] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [minimized, setMinimized] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const renderCanvasRef = useRef<HTMLCanvasElement>(null);
   const connectButtonRef = useRef<HTMLButtonElement>(null);
   const elapsedTimerRef = useRef<number | null>(null);
-  const recognitionRef = useRef<any>(null);
-  const finalTranscriptRef = useRef("");
 
-  const { client, connected, connect, disconnect, volume, clearLatestResponse, sendTextAndGetResponse } =
+  const {
+    client,
+    connected,
+    connect,
+    disconnect,
+    volume,
+    clearLatestResponse,
+    clearLatestUserTranscript,
+    latestUserTranscript,
+    detectedInputLanguage,
+    sendTextAndGetResponse,
+  } =
     useLiveAPIContext();
 
   // Note: removed auto-focus on connectButton to prevent stealing focus from form inputs on other pages
@@ -108,6 +118,12 @@ function ControlTray({
       `${Math.max(5, Math.min(inVolume * 200, 8))}px`
     );
   }, [inVolume]);
+
+  useEffect(() => {
+    if (isRecording) {
+      onUserTranscriptChange?.(latestUserTranscript, false);
+    }
+  }, [isRecording, latestUserTranscript, onUserTranscriptChange]);
 
   useEffect(() => {
     if (!isRecording) {
@@ -198,43 +214,8 @@ function ControlTray({
   const startRecording = async () => {
     await connect();
     setElapsedSeconds(0);
-    finalTranscriptRef.current = "";
+    clearLatestUserTranscript();
     onUserTranscriptChange?.("", false);
-
-    const SpeechRecognitionCtor =
-      typeof window !== "undefined"
-        ? (window as any).SpeechRecognition ||
-          (window as any).webkitSpeechRecognition
-        : undefined;
-
-    if (SpeechRecognitionCtor) {
-      const recognition = new SpeechRecognitionCtor();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = "";
-
-      recognition.onresult = (event: any) => {
-        let interim = "";
-        let finalText = finalTranscriptRef.current;
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const transcript = event.results[i][0]?.transcript || "";
-          if (event.results[i].isFinal) {
-            finalText = `${finalText} ${transcript}`.trim();
-          } else {
-            interim += transcript;
-          }
-        }
-        finalTranscriptRef.current = finalText;
-        onUserTranscriptChange?.(`${finalText} ${interim}`.trim(), false);
-      };
-
-      recognition.onerror = (event: any) => {
-        console.error("Speech recognition error:", event?.error || event);
-      };
-
-      recognitionRef.current = recognition;
-      try { recognition.start(); } catch (e) {}
-    }
 
     setIsRecording(true);
   };
@@ -242,174 +223,105 @@ function ControlTray({
   const stopRecordingAndSubmit = async () => {
     setIsRecording(false);
     audioRecorder.stop();
-    const recognition = recognitionRef.current;
-    if (recognition) {
-      try { recognition.stop(); } catch (e) {}
-    }
 
-    const transcript = finalTranscriptRef.current.trim();
+    const transcript = latestUserTranscript.trim();
     onUserTranscriptChange?.(transcript, true);
 
     if (!transcript) return;
 
-    sendTextAndGetResponse(transcript);
+    sendTextAndGetResponse(transcript, detectedInputLanguage);
   };
 
   return (
-    <section
-      className={
-        containerClassName ||
-        `
-        fixed 
-        bottom-4 
-        right-4
-        bg-gray-900/90 
-        backdrop-blur-xl 
-        rounded-2xl 
-        shadow-2xl 
-        border 
-        border-gray-800/50 
-        p-4
-        w-auto
-        flex 
-        flex-col 
-        items-center 
-        space-y-4
-        ring-1
-        ring-white/10
-        z-50
-      `
-      }
-    >
-      <div className="flex flex-col items-center mb-2">
-        <h2 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-emerald-600">
-          AgriAid
-        </h2>
-        <p className="text-[10px] uppercase tracking-[0.2em] text-gray-400 font-medium">
-          Multilingual Assistant
-        </p>
-      </div>
+    <section className={containerClassName || `fixed bottom-4 right-4 bg-gray-900/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-800/50 ring-1 ring-white/10 z-50 w-auto`}>
       <canvas className="hidden" ref={renderCanvasRef} />
-      <nav className="flex items-center justify-center gap-4 w-full">
-        <div className="flex items-center gap-2">
-          <button
-            className={`
-              p-2 
-              rounded-lg 
-              transition-all 
-              duration-300 
-              ${
-                muted
-                  ? "bg-red-600/20 text-red-500 hover:bg-red-600/30"
-                  : "bg-gray-800 text-gray-300 hover:bg-gray-700"
-              }
-            `}
-            onClick={() => setMuted(!muted)}
-          >
-            {muted ? <MicOff size={24} /> : <Mic size={24} />}
-          </button>
 
-          <div
-            className="
-              flex 
-              items-center 
-              justify-center 
-              w-12 
-              h-12 
-              bg-gray-800 
-              rounded-lg 
-              transition-all 
-              duration-300 
-              hover:bg-gray-700
-            "
-          >
-            <AudioPulse volume={volume} active={connected} hover={false} />
-          </div>
+      {/* Header - always visible */}
+      <div
+        className="flex items-center justify-between px-4 py-3 cursor-pointer select-none"
+        onClick={() => setMinimized((v) => !v)}
+      >
+        <div>
+          <h2 className="text-base font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-emerald-600">
+            AgriAid
+          </h2>
+          <p className="text-[10px] uppercase tracking-[0.2em] text-gray-400">
+            {isRecording ? `Recording... ${formatElapsedTime(elapsedSeconds)}` : connected ? "Live" : "Multilingual Assistant"}
+          </p>
         </div>
-
-        {supportsVideo && (
-          <div className="flex items-center gap-2">
-            <MediaStreamButton
-              isStreaming={screenCapture.isStreaming}
-              start={changeStreams(screenCapture)}
-              stop={changeStreams()}
-              onIcon={<MonitorOff size={24} />}
-              offIcon={<Monitor size={24} />}
-            />
-            <MediaStreamButton
-              isStreaming={webcam.isStreaming}
-              start={changeStreams(webcam)}
-              stop={changeStreams()}
-              onIcon={<VideoOff size={24} />}
-              offIcon={<Video size={24} />}
-            />
-          </div>
-        )}
-
-        {children}
-      </nav>
-
-      <div className="flex flex-col items-center space-y-2">
-        <button
-          ref={connectButtonRef}
-          className={`
-            p-3 
-            rounded-lg 
-            transition-all 
-            duration-300 
-            flex 
-            items-center 
-            gap-2 
-            ${
-              connected
-                ? "bg-red-600/20 text-red-500 hover:bg-red-600/30"
-                : "bg-green-600/20 text-green-500 hover:bg-green-600/30"
-            }
-          `}
-          onClick={connected ? disconnect : connect}
-        >
-          {connected ? <Pause size={24} /> : <Play size={24} />}
-          <span className="text-sm">
-            {connected ? "Pause" : "Start"} Streaming
-          </span>
-        </button>
-
-        <div className="flex flex-col items-center gap-2">
-          <button
-            type="button"
-            onClick={isRecording ? stopRecordingAndSubmit : startRecording}
-            disabled={muted}
-            className={`
-              px-4
-              py-2
-              rounded-lg
-              text-sm
-              font-medium
-              transition-all
-              duration-300
-              ${
-                isRecording
-                  ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                  : "bg-blue-600 text-white hover:bg-blue-700"
-              }
-              disabled:opacity-50
-              disabled:cursor-not-allowed
-            `}
-          >
-            {isRecording ? "Stop & Submit" : "Start Recording"}
-          </button>
-
-          <span className="text-xs text-gray-400">
-            {isRecording
-              ? `Recording... ${formatElapsedTime(elapsedSeconds)}`
-              : "Tap start recording, speak as long as needed, then submit."}
-          </span>
-        </div>
-
-        <span className="text-xs text-gray-400 opacity-70">
-          {connected ? "Live" : "Offline"}
-        </span>
+        <span className="text-gray-400 text-lg leading-none ml-4">{minimized ? "▲" : "▼"}</span>
       </div>
+
+      {/* Collapsible body */}
+      {!minimized && (
+        <div className="flex flex-col items-center space-y-4 px-4 pb-4">
+          <nav className="flex items-center justify-center gap-4 w-full">
+            <div className="flex items-center gap-2">
+              <button
+                className={`p-2 rounded-lg transition-all duration-300 ${
+                  muted ? "bg-red-600/20 text-red-500 hover:bg-red-600/30" : "bg-gray-800 text-gray-300 hover:bg-gray-700"
+                }`}
+                onClick={() => setMuted(!muted)}
+              >
+                {muted ? <MicOff size={24} /> : <Mic size={24} />}
+              </button>
+              <div className="flex items-center justify-center w-12 h-12 bg-gray-800 rounded-lg hover:bg-gray-700">
+                <AudioPulse volume={volume} active={connected} hover={false} />
+              </div>
+            </div>
+
+            {supportsVideo && (
+              <div className="flex items-center gap-2">
+                <MediaStreamButton
+                  isStreaming={screenCapture.isStreaming}
+                  start={changeStreams(screenCapture)}
+                  stop={changeStreams()}
+                  onIcon={<MonitorOff size={24} />}
+                  offIcon={<Monitor size={24} />}
+                />
+                <MediaStreamButton
+                  isStreaming={webcam.isStreaming}
+                  start={changeStreams(webcam)}
+                  stop={changeStreams()}
+                  onIcon={<VideoOff size={24} />}
+                  offIcon={<Video size={24} />}
+                />
+              </div>
+            )}
+            {children}
+          </nav>
+
+          <div className="flex flex-col items-center space-y-2 w-full">
+            <button
+              ref={connectButtonRef}
+              className={`p-3 rounded-lg transition-all duration-300 flex items-center gap-2 ${
+                connected ? "bg-red-600/20 text-red-500 hover:bg-red-600/30" : "bg-green-600/20 text-green-500 hover:bg-green-600/30"
+              }`}
+              onClick={connected ? disconnect : connect}
+            >
+              {connected ? <Pause size={24} /> : <Play size={24} />}
+              <span className="text-sm">{connected ? "Pause" : "Start"} Streaming</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={isRecording ? stopRecordingAndSubmit : startRecording}
+              disabled={muted}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed ${
+                isRecording ? "bg-emerald-600 text-white hover:bg-emerald-700" : "bg-blue-600 text-white hover:bg-blue-700"
+              }`}
+            >
+              {isRecording ? "Stop & Submit" : "Start Recording"}
+            </button>
+
+            <span className="text-xs text-gray-400 text-center">
+              {isRecording
+                ? `Recording... ${formatElapsedTime(elapsedSeconds)}`
+                : "Tap start recording, speak, then submit."}
+            </span>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

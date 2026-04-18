@@ -18,6 +18,8 @@ export type LiveConfig = {
   model: string;
   systemInstruction?: { parts: Part[] };
   generationConfig?: Partial<LiveGenerationConfig>;
+  inputAudioTranscription?: Record<string, never>;
+  outputAudioTranscription?: Record<string, never>;
   tools?: Array<Tool | { googleSearch: {} } | { codeExecution: {} }>;
 };
 
