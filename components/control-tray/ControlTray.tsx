@@ -92,11 +92,16 @@ function ControlTray({
   const [isRecording, setIsRecording] = useState(false);
   const [minimized, setMinimized] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [autoMode, setAutoMode] = useState(true);
+  const [isSoundDetected, setIsSoundDetected] = useState(false);
+  
   const renderCanvasRef = useRef<HTMLCanvasElement>(null);
   const connectButtonRef = useRef<HTMLButtonElement>(null);
   const elapsedTimerRef = useRef<number | null>(null);
   const transcriptCallbackRef = useRef(onUserTranscriptChange);
   const lastTranscriptRef = useRef("");
+  const lastSoundTimeRef = useRef<number>(0);
+  const silenceTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     transcriptCallbackRef.current = onUserTranscriptChange;
@@ -126,15 +131,15 @@ function ControlTray({
   }, [inVolume]);
 
   useEffect(() => {
-    if (!isRecording) return;
+    if (!isRecording && !isSoundDetected) return;
     if (latestUserTranscript === lastTranscriptRef.current) return;
 
     lastTranscriptRef.current = latestUserTranscript;
     transcriptCallbackRef.current?.(latestUserTranscript, false);
-  }, [isRecording, latestUserTranscript]);
+  }, [isRecording, isSoundDetected, latestUserTranscript]);
 
   useEffect(() => {
-    if (!isRecording) {
+    if (!isRecording && !isSoundDetected) {
       if (elapsedTimerRef.current) {
         window.clearInterval(elapsedTimerRef.current);
         elapsedTimerRef.current = null;
@@ -142,9 +147,11 @@ function ControlTray({
       return;
     }
 
-    elapsedTimerRef.current = window.setInterval(() => {
-      setElapsedSeconds((current) => current + 1);
-    }, 1000);
+    if (!elapsedTimerRef.current) {
+      elapsedTimerRef.current = window.setInterval(() => {
+        setElapsedSeconds((current) => current + 1);
+      }, 1000);
+    }
 
     return () => {
       if (elapsedTimerRef.current) {
@@ -152,23 +159,46 @@ function ControlTray({
         elapsedTimerRef.current = null;
       }
     };
-  }, [isRecording]);
+  }, [isRecording, isSoundDetected]);
 
   useEffect(() => {
     const onData = (base64: string) => {
-      client.sendRealtimeInput([
-        { mimeType: "audio/pcm;rate=16000", data: base64 },
-      ]);
+      if (isRecording || (autoMode && isSoundDetected)) {
+        client.sendRealtimeInput([
+          { mimeType: "audio/pcm;rate=16000", data: base64 },
+        ]);
+      }
     };
-    if (connected && isRecording && !muted && audioRecorder) {
-      audioRecorder.on("data", onData).on("volume", setInVolume).start();
+
+    const handleVolume = (vol: number) => {
+      setInVolume(vol);
+      if (autoMode && vol > 0.05) {
+        setIsSoundDetected(true);
+        lastSoundTimeRef.current = Date.now();
+        if (silenceTimerRef.current) {
+          window.clearTimeout(silenceTimerRef.current);
+          silenceTimerRef.current = null;
+        }
+      } else if (autoMode && isSoundDetected) {
+        if (!silenceTimerRef.current) {
+          silenceTimerRef.current = window.setTimeout(() => {
+            setIsSoundDetected(false);
+            silenceTimerRef.current = null;
+          }, 2000); // 2 seconds of silence to stop sending
+        }
+      }
+    };
+
+    if (connected && !muted && audioRecorder) {
+      audioRecorder.on("data", onData).on("volume", handleVolume).start();
     } else {
       audioRecorder.stop();
     }
     return () => {
-      audioRecorder.off("data", onData).off("volume", setInVolume);
+      audioRecorder.off("data", onData).off("volume", handleVolume);
+      if (silenceTimerRef.current) window.clearTimeout(silenceTimerRef.current);
     };
-  }, [connected, client, muted, audioRecorder, isRecording]);
+  }, [connected, client, muted, audioRecorder, isRecording, autoMode, isSoundDetected]);
 
   useEffect(() => {
     if (videoRef.current) {
@@ -256,10 +286,15 @@ function ControlTray({
             AgriAid
           </h2>
           <p className="text-[10px] uppercase tracking-[0.2em] text-gray-400">
-            {isRecording ? `Recording... ${formatElapsedTime(elapsedSeconds)}` : connected ? "Live" : "Multilingual Assistant"}
+            {isRecording || isSoundDetected ? `Listening... ${formatElapsedTime(elapsedSeconds)}` : connected ? "Live & Ready" : "Multilingual Assistant"}
           </p>
         </div>
-        <span className="text-gray-400 text-lg leading-none ml-4">{minimized ? "▲" : "▼"}</span>
+        <div className="flex items-center gap-2">
+          {connected && (
+            <div className={`w-2 h-2 rounded-full ${isSoundDetected ? "bg-green-500 animate-pulse" : "bg-gray-600"}`} />
+          )}
+          <span className="text-gray-400 text-lg leading-none ml-2">{minimized ? "▲" : "▼"}</span>
+        </div>
       </div>
 
       {/* Collapsible body */}
@@ -315,6 +350,16 @@ function ControlTray({
 
             <button
               type="button"
+              onClick={() => setAutoMode(!autoMode)}
+              className={`px-4 py-2 rounded-lg text-xs font-medium transition-all duration-300 ${
+                autoMode ? "bg-purple-600/20 text-purple-400 border border-purple-500/30" : "bg-gray-800 text-gray-400 border border-gray-700"
+              }`}
+            >
+              {autoMode ? "Auto-Detect: ON" : "Auto-Detect: OFF"}
+            </button>
+
+            <button
+              type="button"
               onClick={isRecording ? stopRecordingAndSubmit : startRecording}
               disabled={muted}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed ${
@@ -325,9 +370,13 @@ function ControlTray({
             </button>
 
             <span className="text-xs text-gray-400 text-center">
-              {isRecording
-                ? `Recording... ${formatElapsedTime(elapsedSeconds)}`
-                : "Tap start recording, speak, then submit."}
+              {isSoundDetected
+                ? "Listening to you..."
+                : isRecording
+                ? `Manual Recording... ${formatElapsedTime(elapsedSeconds)}`
+                : autoMode && connected
+                ? "Speak anytime, AgriAid is listening."
+                : "Tap start to begin."}
             </span>
           </div>
         </div>

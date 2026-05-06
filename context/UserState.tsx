@@ -18,6 +18,18 @@ const RegisterationState: React.FC<RegisterationStateProps> = ({
 
   const router = useRouter();
 
+  const parseJsonResponse = async (response: Response) => {
+    const responseText = await response.text();
+
+    try {
+      return responseText ? JSON.parse(responseText) : {};
+    } catch {
+      throw new Error(
+        responseText || `Request failed with status ${response.status}`
+      );
+    }
+  };
+
   const logout = async () => {
     try {
       if (!(await isLoggedIn())) {
@@ -30,7 +42,7 @@ const RegisterationState: React.FC<RegisterationStateProps> = ({
           "Content-Type": "application/json",
         },
       });
-      const data = await response.json();
+      const data = await parseJsonResponse(response);
       if (data.success) {
         toast.success(data.message);
       }
@@ -53,7 +65,7 @@ const RegisterationState: React.FC<RegisterationStateProps> = ({
         },
         body: JSON.stringify(values),
       });
-      const data = await response.json();
+      const data = await parseJsonResponse(response);
 
       if (data.success) {
         toast.success(data.message);
@@ -79,7 +91,7 @@ const RegisterationState: React.FC<RegisterationStateProps> = ({
         },
         body: JSON.stringify(values),
       });
-      const data = await response.json();
+      const data = await parseJsonResponse(response);
       if (data.success) {
         toast.success(data.message);
         // Redirect based on role
@@ -107,7 +119,7 @@ const RegisterationState: React.FC<RegisterationStateProps> = ({
           "Content-Type": "application/json",
         },
       });
-      const data = await response.json();
+      const data = await parseJsonResponse(response);
       return data.success;
     } catch (error) {
       console.log("Error:", error);
@@ -128,7 +140,7 @@ const RegisterationState: React.FC<RegisterationStateProps> = ({
           "Content-Type": "application/json",
         },
       });
-      const data = await response.json();
+      const data = await parseJsonResponse(response);
       if (data.success) {
         if (data.user !== user) {
           setUser(data.user);

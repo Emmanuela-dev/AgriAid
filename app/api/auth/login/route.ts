@@ -9,9 +9,19 @@ export async function POST(req: NextRequest) {
     const email = username;
     const { password, role } = body;
 
+    if (!process.env.NEXT_PUBLIC_TOKEN_SECRETE) {
+      return NextResponse.json(
+        {
+          error: "Server auth secret is not configured",
+          success: false,
+        },
+        { status: 500 }
+      );
+    }
+
     if (!email || !password || !role) {
-      return new NextResponse(
-        JSON.stringify({ error: "Email, password, and role are required", success: false }),
+      return NextResponse.json(
+        { error: "Email, password, and role are required", success: false },
         { status: 400 }
       );
     }
@@ -23,8 +33,11 @@ export async function POST(req: NextRequest) {
     });
 
     if (authError || !authData.user) {
-      return new NextResponse(
-        JSON.stringify({ error: authError?.message || "Invalid credentials", success: false }),
+      return NextResponse.json(
+        {
+          error: authError?.message || "Invalid credentials",
+          success: false,
+        },
         { status: 400 }
       );
     }
@@ -34,8 +47,8 @@ export async function POST(req: NextRequest) {
     if (userRole !== role) {
       // Sign out if role mismatch to prevent unauthorized session
       await supabase.auth.signOut();
-      return new NextResponse(
-        JSON.stringify({ error: "Unauthorized role access", success: false }),
+      return NextResponse.json(
+        { error: "Unauthorized role access", success: false },
         { status: 403 }
       );
     }
@@ -71,8 +84,8 @@ export async function POST(req: NextRequest) {
     console.error("Login error:", error);
     const errorMsg = error instanceof Error ? error.message : JSON.stringify(error);
     console.error("Error details:", errorMsg);
-    return new NextResponse(
-      JSON.stringify({ error: errorMsg || "Internal server error", success: false }),
+    return NextResponse.json(
+      { error: errorMsg || "Internal server error", success: false },
       { status: 500 }
     );
   }
