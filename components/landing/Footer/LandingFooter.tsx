@@ -16,7 +16,7 @@ const LandingFooter = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
           <motion.div variants={fadeInUp}>
             <div className="flex items-center space-x-2 mb-6">
-              <Sprout className="w-8 h-8 text-green-500" />
+              <img src="/images/logo.png" alt="AgriAid Logo" className="w-10 h-10" />
               <span className="text-xl font-bold text-white">AgriAid</span>
             </div>
             <p className="text-gray-400">

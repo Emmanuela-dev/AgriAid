@@ -64,7 +64,7 @@ const HeroSection = () => {
             <div className="relative group">
               <div className="absolute -inset-4 bg-green-500/20 rounded-3xl blur-2xl group-hover:bg-green-500/30 transition-all duration-500" />
               <motion.img
-                src="/images/hero_kenyan_farmer.png"
+                src="/images/hero_farmer.png"
                 alt="Kenyan Farmer using AgriAid"
                 className="relative rounded-2xl shadow-2xl w-full h-auto object-cover aspect-[4/3]"
                 whileHover={{ scale: 1.02 }}

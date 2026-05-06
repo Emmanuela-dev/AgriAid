@@ -7,14 +7,14 @@ export class AudioStreamer {
   public audioQueue: Float32Array[] = [];
   private isPlaying: boolean = false;
   private sampleRate: number = 24000;
-  private bufferSize: number = 7680;
+  private bufferSize: number = 2048; // Smaller buffer for more responsive playback
   private processingBuffer: Float32Array = new Float32Array(0);
   private scheduledTime: number = 0;
   public gainNode: GainNode;
   public source: AudioBufferSourceNode;
   public isStreamComplete: boolean = false;
   private checkInterval: number | null = null;
-  private initialBufferTime: number = 0.1; //0.1 // 100ms initial buffer
+  private initialBufferTime: number = 0.3; // 300ms initial buffer to prevent breaking
   private endOfQueueAudioSource: AudioBufferSourceNode | null = null;
 
   public onComplete = () => {};
@@ -136,8 +136,6 @@ export class AudioStreamer {
 
       if (worklets) {
         Object.entries(worklets).forEach(([workletName, graph]) => {
-          console.log("workletName", workletName);
-
           const { node, handlers } = graph;
           if (node) {
             source.connect(node);
@@ -150,10 +148,6 @@ export class AudioStreamer {
           }
         });
       }
-
-      // i added this trying to fix clicks
-      // this.gainNode.gain.setValueAtTime(0, 0);
-      // this.gainNode.gain.linearRampToValueAtTime(1, 1);
 
       // Ensure we never schedule in the past
       const startTime = Math.max(this.scheduledTime, this.context.currentTime);

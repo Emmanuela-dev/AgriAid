@@ -1,8 +1,6 @@
-export const logo =
-  "https://res.cloudinary.com/dehegwbs0/image/upload/v1741278718/g3ydnuciiz2yf4j3vs2k.png";
+export const logo = "/images/logo.png";
 
-export const logo_small =
-  "https://res.cloudinary.com/dehegwbs0/image/upload/v1741278718/jyxcmnk716esmimc55ec.png";
+export const logo_small = "/images/logo.png";
 
 export const step_3_sampling =
   "https://res.cloudinary.com/dehegwbs0/image/upload/v1741278719/p5wcuvohpyx48pee1nqg.jpg";
