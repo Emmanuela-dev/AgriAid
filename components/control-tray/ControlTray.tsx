@@ -13,6 +13,7 @@ import { useScreenCapture } from "@/hooks/use-screen-capture";
 import { UseMediaStreamResult } from "@/hooks/use-media-stream-mux";
 import { AudioRecorder } from "@/lib/audio-recorder";
 import AudioPulse from "../audio-pulse/AudioPulse";
+import toast from "react-hot-toast";
 import {
   Mic,
   MicOff,
@@ -103,6 +104,11 @@ function ControlTray({
   const lastSoundTimeRef = useRef<number>(0);
   const silenceTimerRef = useRef<number | null>(null);
 
+  const handlePermissionFailure = (error: unknown, feature: string) => {
+    console.error(`Failed to start ${feature}:`, error);
+    toast.error(`${feature} permission is required to use this feature.`);
+  };
+
   useEffect(() => {
     transcriptCallbackRef.current = onUserTranscriptChange;
   }, [onUserTranscriptChange]);
@@ -190,7 +196,10 @@ function ControlTray({
     };
 
     if (connected && !muted && audioRecorder) {
-      audioRecorder.on("data", onData).on("volume", handleVolume).start();
+      audioRecorder.on("data", onData).on("volume", handleVolume);
+      void audioRecorder.start().catch((error) => {
+        handlePermissionFailure(error, "microphone");
+      });
     } else {
       audioRecorder.stop();
     }
@@ -230,10 +239,18 @@ function ControlTray({
 
   const changeStreams = (next?: UseMediaStreamResult) => async () => {
     if (next) {
-      const mediaStream = await next.start();
-      setActiveVideoStream(mediaStream);
-      onVideoStreamChange(mediaStream);
-      return mediaStream;
+      try {
+        const mediaStream = await next.start();
+        setActiveVideoStream(mediaStream);
+        onVideoStreamChange(mediaStream);
+        return mediaStream;
+      } catch (error) {
+        handlePermissionFailure(
+          error,
+          next.type === "screen" ? "screen capture" : "camera"
+        );
+        return Promise.resolve(null as unknown as MediaStream);
+      }
     } else {
       setActiveVideoStream(null);
       onVideoStreamChange(null);
@@ -250,13 +267,17 @@ function ControlTray({
   };
 
   const startRecording = async () => {
-    await connect();
-    setElapsedSeconds(0);
-    clearLatestUserTranscript();
-    lastTranscriptRef.current = "";
-    onUserTranscriptChange?.("", false);
+    try {
+      await connect();
+      setElapsedSeconds(0);
+      clearLatestUserTranscript();
+      lastTranscriptRef.current = "";
+      onUserTranscriptChange?.("", false);
 
-    setIsRecording(true);
+      setIsRecording(true);
+    } catch (error) {
+      handlePermissionFailure(error, "streaming connection");
+    }
   };
 
   const stopRecordingAndSubmit = async () => {

@@ -193,6 +193,23 @@ function VoiceChatSurface({
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, liveTranscript]);
 
+  const [isOffline, setIsOffline] = useState(false);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOffline(false);
+    const handleOffline = () => setIsOffline(true);
+
+    setIsOffline(!navigator.onLine);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
   return (
     <div className="fixed left-4 right-4 bottom-4 z-50">
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.5fr)_minmax(340px,0.9fr)] gap-4 items-end">
@@ -204,7 +221,14 @@ function VoiceChatSurface({
             className="flex items-center justify-between px-4 py-3 cursor-pointer select-none"
             onClick={() => setMinimized((v) => !v)}
           >
-            <h3 className="text-sm font-semibold text-gray-900">AgriAid Voice Conversation</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-gray-900">AgriAid Voice Conversation</h3>
+              {isOffline && (
+                <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200 animate-pulse">
+                  OFFLINE MODE
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-2">
               <span className="text-xs px-2 py-1 rounded-full border border-green-200 bg-green-50 text-green-700">
                 {isResponding ? "Responding..." : "Ready"}
