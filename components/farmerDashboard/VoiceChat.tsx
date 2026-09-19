@@ -1,11 +1,10 @@
-import { useEffect, useRef, useState, useCallback } from "react";
-import { useConversation } from "@elevenlabs/react";
-import { Mic, Download, Loader2, X, Volume2 } from "lucide-react";
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { ConversationProvider, useConversation } from "@elevenlabs/react";
+import { Mic, Download, Phone, PhoneOff, Settings } from "lucide-react";
 
 const AGENT_ID = process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID;
-if (!AGENT_ID) {
-  console.warn("NEXT_PUBLIC_ELEVENLABS_AGENT_ID not configured. VoiceChat will show setup instructions.");
-}
 
 const formatTimestamp = () =>
   new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
@@ -15,7 +14,6 @@ type ConversationMessage = {
   role: "farmer" | "assistant";
   text: string;
   createdAt: string;
-  pending?: boolean;
 };
 
 const CHAT_STORAGE_KEY = "agriaid_voice_chat_history";
@@ -26,40 +24,90 @@ const formatTime = (isoDate: string) =>
     minute: "2-digit",
   });
 
-type ConnectionStatus = "idle" | "connecting" | "connected" | "disconnected" | "error";
-
-function VoiceChatSurface() {
+// Inner component that uses the conversation hook
+function VoiceInterface() {
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [minimized, setMinimized] = useState(false);
-  const [status, setStatus] = useState<ConnectionStatus>("idle");
-  const [error, setError] = useState<string>("");
+  const [inputMessage, setInputMessage] = useState("");
+  const [isMounted, setIsMounted] = useState(false);
+  const [micPermission, setMicPermission] = useState<'prompt' | 'granted' | 'denied' | 'unsupported'>('prompt');
+  const [showPermissionPrompt, setShowPermissionPrompt] = useState(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
-  const conversationStartedRef = useRef(false);
 
-  // ElevenLabs Conversation Hook
+  // Check browser support and microphone permission on mount
+  useEffect(() => {
+    setIsMounted(true);
+    
+    const checkMicrophoneAccess = async () => {
+      if (typeof window === 'undefined') return;
+      
+      console.log('Checking microphone access...');
+      console.log('navigator.mediaDevices:', navigator.mediaDevices);
+      console.log('getUserMedia available:', !!navigator.mediaDevices?.getUserMedia);
+      console.log('isSecureContext:', window.isSecureContext);
+      console.log('location.protocol:', window.location.protocol);
+      console.log('location.hostname:', window.location.hostname);
+      
+      // Check if browser supports getUserMedia
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.error('Browser does not support getUserMedia');
+        setMicPermission('unsupported');
+        return;
+      }
+
+      console.log('getUserMedia is supported!');
+
+      // Check current permission state
+      try {
+        if (navigator.permissions && navigator.permissions.query) {
+          const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+          
+          console.log('Permission status:', permissionStatus.state);
+          
+          if (permissionStatus.state === 'granted') {
+            setMicPermission('granted');
+          } else if (permissionStatus.state === 'denied') {
+            setMicPermission('denied');
+            setShowPermissionPrompt(true);
+          } else {
+            // Permission not yet requested - show prompt
+            setMicPermission('prompt');
+            setShowPermissionPrompt(true);
+          }
+
+          // Listen for permission changes
+          permissionStatus.onchange = () => {
+            setMicPermission(permissionStatus.state as 'granted' | 'denied' | 'prompt');
+            if (permissionStatus.state === 'denied') {
+              setShowPermissionPrompt(true);
+            }
+          };
+        } else {
+          // Permissions API not supported, will check on first call
+          console.log('Permissions API not available, defaulting to prompt');
+          setMicPermission('prompt');
+          setShowPermissionPrompt(true);
+        }
+      } catch (error) {
+        console.warn('Could not check microphone permission:', error);
+        setMicPermission('prompt');
+        setShowPermissionPrompt(true);
+      }
+    };
+
+    checkMicrophoneAccess();
+  }, []);
+
   const conversation = useConversation({
     onConnect: () => {
-      console.log("ElevenLabs connected");
-      setStatus("connected");
-      setError("");
+      console.log("Connected to AgroVoice");
     },
     onDisconnect: () => {
-      console.log("ElevenLabs disconnected");
-      setStatus("disconnected");
-      conversationStartedRef.current = false;
+      console.log("Disconnected from AgroVoice");
     },
-    onError: (error) => {
-      console.error("ElevenLabs error:", error);
-      setStatus("error");
-      setError(getErrorMessage(error));
-      conversationStartedRef.current = false;
-    },
-    onMessage: (message) => {
-      console.log("ElevenLabs message:", message);
-      
+    onMessage: (message: any) => {
       const createdAt = new Date().toISOString();
       
-      // Handle user message
       if (message.source === "user" && message.message) {
         setMessages((current) => [
           ...current,
@@ -72,13 +120,10 @@ function VoiceChatSurface() {
         ]);
       }
       
-      // Handle AI response
       if (message.source === "ai" && message.message) {
         setMessages((current) => {
-          // Check if last message is from assistant
           const lastMsg = current[current.length - 1];
           if (lastMsg && lastMsg.role === "assistant") {
-            // Update existing assistant message
             return [
               ...current.slice(0, -1),
               {
@@ -87,7 +132,6 @@ function VoiceChatSurface() {
               },
             ];
           } else {
-            // Create new assistant message
             return [
               ...current,
               {
@@ -101,9 +145,12 @@ function VoiceChatSurface() {
         });
       }
     },
+    onError: (error: any) => {
+      console.error("AgroVoice error:", error);
+    },
   });
 
-  // Load chat history from localStorage
+  // Load chat history
   useEffect(() => {
     try {
       const raw = localStorage.getItem(CHAT_STORAGE_KEY);
@@ -117,7 +164,7 @@ function VoiceChatSurface() {
     }
   }, []);
 
-  // Save chat history to localStorage
+  // Save chat history
   useEffect(() => {
     try {
       localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages));
@@ -126,80 +173,11 @@ function VoiceChatSurface() {
     }
   }, [messages]);
 
-  // Auto-scroll to bottom
+  // Auto-scroll
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (conversationStartedRef.current) {
-        conversation.endSession().catch(console.error);
-      }
-    };
-  }, [conversation]);
-
-  const startConversation = useCallback(async () => {
-    if (conversationStartedRef.current || status === "connecting" || status === "connected") {
-      console.warn("Conversation already started or in progress");
-      return;
-    }
-
-    if (!AGENT_ID) {
-      setStatus("error");
-      setError("Agent ID is not configured. Please add NEXT_PUBLIC_ELEVENLABS_AGENT_ID to your environment variables.");
-      return;
-    }
-
-    try {
-      setStatus("connecting");
-      setError("");
-      conversationStartedRef.current = true;
-
-      // Request microphone permission
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach(track => track.stop());
-
-      // Start ElevenLabs conversation
-      await conversation.startSession({
-        agentId: AGENT_ID,
-      });
-
-    } catch (err: unknown) {
-      conversationStartedRef.current = false;
-      setStatus("error");
-      
-      if (err instanceof Error) {
-        if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
-          setError("We couldn't access your microphone. Please allow microphone access and try again.");
-        } else if (err.name === "NotFoundError") {
-          setError("No microphone found. Please connect a microphone and try again.");
-        } else if (err.name === "NotSupportedError") {
-          setError("Your browser doesn't support microphone access. Please use a modern browser like Chrome or Firefox.");
-        } else {
-          setError("Failed to start conversation. Please try again.");
-        }
-      } else {
-        setError("An unexpected error occurred. Please try again.");
-      }
-      
-      console.error("Failed to start conversation:", err);
-    }
-  }, [conversation, status]);
-
-  const endConversation = useCallback(async () => {
-    try {
-      await conversation.endSession();
-      setStatus("idle");
-      conversationStartedRef.current = false;
-      setError("");
-    } catch (err) {
-      console.error("Failed to end conversation:", err);
-      setStatus("idle");
-      conversationStartedRef.current = false;
-    }
-  }, [conversation]);
   const saveRecommendationDocument = (content: string) => {
     if (!content.trim()) return;
     import("jspdf").then(({ jsPDF }) => {
@@ -208,7 +186,6 @@ function VoiceChatSurface() {
       const pageWidth = doc.internal.pageSize.getWidth();
       const maxWidth = pageWidth - margin * 2;
 
-      // header
       doc.setFillColor(34, 197, 94);
       doc.rect(0, 0, pageWidth, 22, "F");
       doc.setTextColor(255, 255, 255);
@@ -216,12 +193,10 @@ function VoiceChatSurface() {
       doc.setFont("helvetica", "bold");
       doc.text("AgriAid Recommendation", margin, 14);
 
-      // date
       doc.setFontSize(8);
       doc.setFont("helvetica", "normal");
       doc.text(new Date().toLocaleString(), pageWidth - margin, 14, { align: "right" });
 
-      // body
       doc.setTextColor(30, 30, 30);
       doc.setFontSize(11);
       doc.setFont("helvetica", "normal");
@@ -238,6 +213,64 @@ function VoiceChatSurface() {
 
       doc.save(`agriaid-recommendation-${formatTimestamp()}.pdf`);
     });
+  };
+
+  const handleStartCall = async () => {
+    if (!AGENT_ID) {
+      console.error("Agent ID not configured");
+      return;
+    }
+    
+    try {
+      // Request microphone permission if not already granted
+      if (micPermission !== 'granted') {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // Stop the stream immediately - we just needed permission
+        stream.getTracks().forEach(track => track.stop());
+        setMicPermission('granted');
+        setShowPermissionPrompt(false);
+      }
+      
+      // Start the conversation
+      await conversation.startSession({ agentId: AGENT_ID });
+    } catch (error: any) {
+      console.error("Failed to start conversation:", error);
+      
+      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+        setMicPermission('denied');
+        setShowPermissionPrompt(true);
+      } else if (error.name === 'NotFoundError') {
+        alert("No microphone found. Please connect a microphone and try again.");
+      } else {
+        alert(`Failed to start voice call: ${error.message || 'Unknown error'}`);
+      }
+    }
+  };
+
+  const handleEndCall = async () => {
+    try {
+      await conversation.endSession();
+    } catch (error) {
+      console.error("Failed to end conversation:", error);
+    }
+  };
+
+  const handleSendMessage = () => {
+    if (!inputMessage.trim() || conversation.status !== "connected") return;
+    
+    // Add message to chat
+    const createdAt = new Date().toISOString();
+    setMessages((current) => [
+      ...current,
+      {
+        id: `farmer-${Date.now()}`,
+        role: "farmer",
+        text: inputMessage,
+        createdAt,
+      },
+    ]);
+    
+    setInputMessage("");
   };
 
   const [isOffline, setIsOffline] = useState(false);
@@ -257,26 +290,129 @@ function VoiceChatSurface() {
     };
   }, []);
 
-  const getStatusText = () => {
-    switch (status) {
-      case "connecting":
-        return "Connecting...";
-      case "connected":
-        return "Listening";
-      case "error":
-        return "Error";
-      default:
-        return "Ready";
+  const isConnected = conversation.status === "connected";
+  const isConnecting = conversation.status === "connecting";
+
+  // Request microphone access helper
+  const requestMicrophoneAccess = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Stop the stream immediately - we just needed permission
+      stream.getTracks().forEach(track => track.stop());
+      setMicPermission('granted');
+      setShowPermissionPrompt(false);
+    } catch (error: any) {
+      if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+        setMicPermission('denied');
+      }
+      console.error('Microphone access error:', error);
     }
   };
 
+  // Don't render until mounted (avoid SSR issues)
+  if (!isMounted) {
+    return null;
+  }
+
   return (
-    <div className="fixed left-4 right-4 bottom-4 z-50">
+    <>
+      {/* Microphone Permission Prompt Modal */}
+      {showPermissionPrompt && micPermission !== 'granted' && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
+            {micPermission === 'unsupported' ? (
+              <>
+                <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto">
+                  <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 text-center">
+                  Browser Not Supported
+                </h3>
+                <p className="text-sm text-gray-600 text-center">
+                  Your browser doesn't support microphone access. Please use Chrome, Firefox, Edge, or Safari on a modern device.
+                </p>
+                <button
+                  onClick={() => setShowPermissionPrompt(false)}
+                  className="w-full py-3 bg-gray-800 text-white rounded-lg font-medium hover:bg-gray-700 transition-colors"
+                >
+                  Close
+                </button>
+              </>
+            ) : micPermission === 'denied' ? (
+              <>
+                <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center mx-auto">
+                  <Mic className="w-6 h-6 text-amber-600" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 text-center">
+                  Microphone Access Denied
+                </h3>
+                <p className="text-sm text-gray-600 text-center">
+                  To use AgroVoice, you need to enable microphone access:
+                </p>
+                <ol className="text-sm text-gray-700 space-y-2 list-decimal list-inside">
+                  <li>Click the 🔒 lock icon in your browser's address bar</li>
+                  <li>Find "Microphone" in the permissions list</li>
+                  <li>Change it to "Allow"</li>
+                  <li>Reload this page</li>
+                </ol>
+                <button
+                  onClick={() => {
+                    setShowPermissionPrompt(false);
+                    window.location.reload();
+                  }}
+                  className="w-full py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors"
+                >
+                  Reload Page
+                </button>
+                <button
+                  onClick={() => setShowPermissionPrompt(false)}
+                  className="w-full py-2 text-gray-600 text-sm hover:text-gray-800 transition-colors"
+                >
+                  Close
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mx-auto">
+                  <Mic className="w-6 h-6 text-green-600" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 text-center">
+                  Enable Microphone Access
+                </h3>
+                <p className="text-sm text-gray-600 text-center">
+                  AgroVoice needs access to your microphone to have voice conversations with you about farming, crops, and soil health.
+                </p>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-xs text-blue-800">
+                    <strong>Privacy:</strong> Your voice is processed securely. We don't store recordings without your permission.
+                  </p>
+                </div>
+                <button
+                  onClick={requestMicrophoneAccess}
+                  className="w-full py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                >
+                  <Mic size={18} />
+                  Enable Microphone
+                </button>
+                <button
+                  onClick={() => setShowPermissionPrompt(false)}
+                  className="w-full py-2 text-gray-600 text-sm hover:text-gray-800 transition-colors"
+                >
+                  Maybe Later
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div className="fixed left-4 right-4 bottom-4 z-50">
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.5fr)_minmax(340px,0.9fr)] gap-4 items-end">
 
         {/* Chat panel */}
         <div className="bg-white/95 backdrop-blur rounded-2xl border border-green-100 shadow-xl">
-          {/* Header */}
           <div
             className="flex items-center justify-between px-4 py-3 cursor-pointer select-none"
             onClick={() => setMinimized((v) => !v)}
@@ -291,19 +427,16 @@ function VoiceChatSurface() {
             </div>
             <div className="flex items-center gap-2">
               <span className={`text-xs px-2 py-1 rounded-full border ${
-                status === "connected" 
+                isConnected 
                   ? "border-green-200 bg-green-50 text-green-700"
-                  : status === "error"
-                  ? "border-red-200 bg-red-50 text-red-700"
                   : "border-gray-200 bg-gray-50 text-gray-700"
               }`}>
-                {getStatusText()}
+                {isConnected ? "Active" : "Ready"}
               </span>
               <span className="text-gray-400 text-lg leading-none">{minimized ? "▲" : "▼"}</span>
             </div>
           </div>
 
-          {/* Collapsible body */}
           {!minimized && (
             <div className="px-4 pb-4">
               <div className="h-[38vh] overflow-y-auto space-y-3 mb-3">
@@ -326,24 +459,49 @@ function VoiceChatSurface() {
                   </div>
                 ))}
 
-                {!messages.length && status === "idle" && (
+                {!messages.length && !isConnected && (
                   <p className="text-xs text-gray-500">
-                    Click "Start Conversation" below to begin talking with AgroVoice.
+                    Start a voice call to begin talking with AgroVoice.
                   </p>
-                )}
-
-                {status === "error" && error && (
-                  <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-sm text-red-900">
-                    <p className="font-semibold mb-1">Error</p>
-                    {error}
-                  </div>
                 )}
 
                 <div ref={chatEndRef} />
               </div>
 
+              <div className="flex items-center gap-2 mb-3">
+                <input
+                  type="text"
+                  value={inputMessage}
+                  onChange={(e) => setInputMessage(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleSendMessage();
+                    }
+                  }}
+                  placeholder="Send a message to start a chat"
+                  className="flex-1 px-3 py-2 rounded-lg border border-gray-300 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  disabled={!isConnected}
+                />
+                <button
+                  onClick={handleSendMessage}
+                  disabled={!isConnected || !inputMessage.trim()}
+                  className="p-2 rounded-full bg-black text-white hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M5 12l14 0M12 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+
               <div className="flex items-center justify-between gap-3 flex-wrap">
-                <p className="text-xs text-gray-500">Powered by ElevenLabs Conversational AI</p>
+                <div className="flex items-center gap-2">
+                  <button className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
+                    <Settings size={16} className="text-gray-600" />
+                  </button>
+                  <button className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
+                    <Mic size={16} className="text-gray-600" />
+                  </button>
+                </div>
                 <button
                   type="button"
                   onClick={() => {
@@ -351,93 +509,141 @@ function VoiceChatSurface() {
                     saveRecommendationDocument(allText);
                   }}
                   disabled={!messages.length}
-                  className="px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="px-3 py-1.5 rounded-lg bg-green-600 text-white text-xs font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
-                  <Download size={16} />
-                  Download Chat
+                  <Download size={14} />
+                  Download
                 </button>
               </div>
             </div>
           )}
         </div>
 
-        {/* Control Panel */}
-        <div className="bg-gray-900/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-800/50 p-4 flex flex-col items-center space-y-4 ring-1 ring-white/10 h-fit">
-          <div className="text-center">
-            <h2 className="text-base font-bold bg-clip-text text-transparent bg-gradient-to-r from-green-400 to-emerald-600">
-              AgroVoice
-            </h2>
-            <p className="text-[10px] uppercase tracking-[0.2em] text-gray-400">
-              {status === "connected" ? "Listening..." : "Voice Assistant"}
-            </p>
+        {/* Voice Call Interface */}
+        <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl shadow-2xl border border-gray-200 p-6 flex flex-col items-center space-y-6 h-fit">
+          
+          {/* Animated Orb */}
+          <div className="relative w-48 h-48 flex items-center justify-center">
+            {/* Outer glow rings */}
+            {isConnected && (
+              <>
+                <div className="absolute inset-0 rounded-full bg-gradient-to-br from-cyan-400 via-blue-500 to-cyan-300 opacity-20 animate-pulse" style={{ animationDuration: '2s' }} />
+                <div className="absolute inset-2 rounded-full bg-gradient-to-br from-cyan-400 via-blue-500 to-cyan-300 opacity-30 animate-pulse" style={{ animationDuration: '2.5s', animationDelay: '0.5s' }} />
+              </>
+            )}
+            
+            {/* Main orb */}
+            <div className={`relative w-40 h-40 rounded-full bg-gradient-to-br from-cyan-400 via-blue-500 to-cyan-300 shadow-2xl flex items-center justify-center transition-all duration-500 ${
+              isConnected ? 'animate-spin-slow' : ''
+            }`} style={{
+              background: isConnected 
+                ? 'conic-gradient(from 0deg, #67E8F9, #3B82F6, #06B6D4, #67E8F9)'
+                : 'linear-gradient(135deg, #67E8F9 0%, #3B82F6 50%, #06B6D4 100%)'
+            }}>
+            </div>
           </div>
 
-          {status === "connected" && (
-            <div className="w-16 h-16 bg-green-600 rounded-full flex items-center justify-center animate-pulse">
-              <Volume2 className="text-white" size={32} />
-            </div>
-          )}
-
-          {status === "connecting" && (
-            <div className="w-16 h-16 flex items-center justify-center">
-              <Loader2 className="text-green-500 animate-spin" size={32} />
-            </div>
-          )}
-
-          {(status === "idle" || status === "disconnected" || status === "error") && (
-            <div className="w-16 h-16 bg-gray-700 rounded-full flex items-center justify-center">
-              <Mic className="text-gray-300" size={32} />
-            </div>
-          )}
-
-          <div className="flex flex-col gap-2 w-full">
-            {status === "connected" ? (
+          {/* Status Text */}
+          <div className="text-center space-y-1">
+            <h3 className="text-lg font-semibold text-gray-900">
+              {isConnected ? "Connected" : isConnecting ? "Connecting..." : "AgroVoice"}
+            </h3>
+            <p className="text-sm text-gray-600">
+              {isConnected 
+                ? "Speak naturally, I'm listening" 
+                : isConnecting
+                ? "Please wait..."
+                : micPermission === 'granted'
+                ? "Ready to start conversation"
+                : micPermission === 'denied'
+                ? "Microphone access denied"
+                : micPermission === 'unsupported'
+                ? "Browser not supported"
+                : "Enable microphone to start"}
+            </p>
+            {micPermission !== 'granted' && micPermission !== 'unsupported' && !isConnected && (
               <button
-                onClick={endConversation}
-                className="w-full px-4 py-3 rounded-lg bg-red-600 hover:bg-red-700 text-white font-medium transition-colors flex items-center justify-center gap-2"
+                onClick={() => setShowPermissionPrompt(true)}
+                className="text-xs text-green-600 hover:text-green-700 underline mt-2"
               >
-                <X size={20} />
-                End Conversation
-              </button>
-            ) : (
-              <button
-                onClick={startConversation}
-                disabled={status === "connecting"}
-                className="w-full px-4 py-3 rounded-lg bg-green-600 hover:bg-green-700 text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                <Mic size={20} />
-                {status === "connecting" ? "Connecting..." : "Start Conversation"}
+                Enable Microphone
               </button>
             )}
           </div>
 
-          <p className="text-xs text-gray-400 text-center">
-            {status === "connected"
-              ? "Speak naturally, I'm listening..."
-              : status === "connecting"
-              ? "Establishing connection..."
-              : "Click to start talking with AgroVoice"}
-          </p>
+          {/* Call Action Buttons */}
+          <div className="w-full space-y-2">
+            {isConnected ? (
+              <button
+                onClick={handleEndCall}
+                className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2 shadow-lg"
+              >
+                <PhoneOff size={20} />
+                End Call
+              </button>
+            ) : (
+              <button
+                onClick={handleStartCall}
+                disabled={isConnecting || micPermission === 'unsupported'}
+                className={`w-full py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2 shadow-lg ${
+                  (isConnecting || micPermission === 'unsupported') ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
+              >
+                <Phone size={20} />
+                {isConnecting ? 'Connecting...' : 'Start Call'}
+              </button>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* Add custom CSS for spinning animation */}
+      <style jsx>{`
+        @keyframes spin-slow {
+          from {
+            transform: rotate(0deg);
+          }
+          to {
+            transform: rotate(360deg);
+          }
+        }
+        .animate-spin-slow {
+          animation: spin-slow 8s linear infinite;
+        }
+      `}</style>
+      </div>
+    </>
   );
 }
 
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    if (error.message.includes("permission") || error.message.includes("denied")) {
-      return "We couldn't access your microphone. Please allow microphone access and try again.";
-    }
-    if (error.message.includes("network") || error.message.includes("connection")) {
-      return "Network connection failed. Please check your internet and try again.";
-    }
-    if (error.message.includes("agent")) {
-      return "Could not connect to AgroVoice. Please try again later.";
-    }
-    return error.message;
+// Outer component with provider
+function VoiceChatSurface() {
+  if (!AGENT_ID) {
+    return (
+      <div className="fixed left-4 right-4 bottom-4 z-50">
+        <div className="bg-yellow-50 border-2 border-yellow-400 rounded-2xl p-6 shadow-xl max-w-md mx-auto">
+          <h3 className="text-lg font-bold text-yellow-900 mb-2">
+            ⚠️ Voice Agent Not Configured
+          </h3>
+          <p className="text-sm text-yellow-800 mb-4">
+            To use AgroVoice, add NEXT_PUBLIC_ELEVENLABS_AGENT_ID to your .env.local file.
+          </p>
+          <button
+            onClick={() => window.open("https://elevenlabs.io/app/conversational-ai", "_blank")}
+            className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+          >
+            Go to ElevenLabs Dashboard
+          </button>
+        </div>
+      </div>
+    );
   }
-  return "An unexpected error occurred. Please try again.";
+
+  return (
+    <ConversationProvider>
+      <VoiceInterface />
+    </ConversationProvider>
+  );
 }
 
 const VoiceChat = () => {
