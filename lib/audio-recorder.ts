@@ -24,6 +24,7 @@ export class AudioRecorder extends EventEmitter {
   vuWorklet: AudioWorkletNode | undefined;
 
   private starting: Promise<void> | null = null;
+  private pcmChunks: Uint8Array[] = [];
 
   constructor(public sampleRate = 16000) {
     super();
@@ -39,6 +40,7 @@ export class AudioRecorder extends EventEmitter {
     }
 
     this.starting = (async () => {
+      this.pcmChunks = [];
       this.stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -65,6 +67,7 @@ export class AudioRecorder extends EventEmitter {
 
         if (arrayBuffer) {
           const arrayBufferString = arrayBufferToBase64(arrayBuffer);
+          this.pcmChunks.push(new Uint8Array(arrayBuffer.slice(0)));
           this.emit("data", arrayBufferString);
         }
       };
@@ -89,6 +92,57 @@ export class AudioRecorder extends EventEmitter {
     } finally {
       this.starting = null;
     }
+  }
+
+  getWavBlob() {
+    const pcmLength = this.pcmChunks.reduce((length, chunk) => length + chunk.length, 0);
+    const wav = new ArrayBuffer(44 + pcmLength);
+    const view = new DataView(wav);
+    const writeText = (offset: number, text: string) => {
+      for (let index = 0; index < text.length; index += 1) {
+        view.setUint8(offset + index, text.charCodeAt(index));
+      }
+    };
+
+    writeText(0, "RIFF");
+    view.setUint32(4, 36 + pcmLength, true);
+    writeText(8, "WAVE");
+    writeText(12, "fmt ");
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, this.sampleRate, true);
+    view.setUint32(28, this.sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    writeText(36, "data");
+    view.setUint32(40, pcmLength, true);
+
+    const pcm = new Uint8Array(wav, 44);
+    let offset = 0;
+    for (const chunk of this.pcmChunks) {
+      pcm.set(chunk, offset);
+      offset += chunk.length;
+    }
+
+    return new Blob([wav], { type: "audio/wav" });
+  }
+
+  async flush() {
+    if (!this.recordingWorklet) return;
+    const flushed = new Promise<void>((resolve) => {
+      const handleData = () => {
+        this.off("data", handleData);
+        resolve();
+      };
+      this.on("data", handleData);
+      this.recordingWorklet?.port.postMessage("flush");
+      window.setTimeout(() => {
+        this.off("data", handleData);
+        resolve();
+      }, 100);
+    });
+    await flushed;
   }
 
   stop() {

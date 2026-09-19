@@ -168,14 +168,6 @@ function ControlTray({
   }, [isRecording, isSoundDetected]);
 
   useEffect(() => {
-    const onData = (base64: string) => {
-      if (isRecording || (autoMode && isSoundDetected)) {
-        client.sendRealtimeInput([
-          { mimeType: "audio/pcm;rate=16000", data: base64 },
-        ]);
-      }
-    };
-
     const handleVolume = (vol: number) => {
       setInVolume(vol);
       if (autoMode && vol > 0.05) {
@@ -196,7 +188,7 @@ function ControlTray({
     };
 
     if (connected && !muted && audioRecorder) {
-      audioRecorder.on("data", onData).on("volume", handleVolume);
+      audioRecorder.on("volume", handleVolume);
       void audioRecorder.start().catch((error) => {
         handlePermissionFailure(error, "microphone");
       });
@@ -204,10 +196,10 @@ function ControlTray({
       audioRecorder.stop();
     }
     return () => {
-      audioRecorder.off("data", onData).off("volume", handleVolume);
+      audioRecorder.off("volume", handleVolume);
       if (silenceTimerRef.current) window.clearTimeout(silenceTimerRef.current);
     };
-  }, [connected, client, muted, audioRecorder, isRecording, autoMode, isSoundDetected]);
+  }, [connected, muted, audioRecorder, isRecording, autoMode, isSoundDetected]);
 
   useEffect(() => {
     if (videoRef.current) {
@@ -225,7 +217,9 @@ function ControlTray({
       if (canvas.width + canvas.height > 0) {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         const base64 = canvas.toDataURL("image/jpeg", 1.0).split(",")[1];
-        client.sendRealtimeInput([{ mimeType: "image/jpeg", data: base64 }]);
+        if (client.ws?.readyState === WebSocket.OPEN) {
+          client.sendRealtimeInput([{ mimeType: "image/jpeg", data: base64 }]);
+        }
       }
       if (connected) {
         timeoutId = window.setTimeout(sendVideoFrame, 1000 / 0.5);
@@ -282,9 +276,22 @@ function ControlTray({
 
   const stopRecordingAndSubmit = async () => {
     setIsRecording(false);
+    await audioRecorder.flush();
     audioRecorder.stop();
 
-    const transcript = latestUserTranscript.trim();
+    const formData = new FormData();
+    formData.append("audio", audioRecorder.getWavBlob(), "agriaid-question.wav");
+    const transcriptionResponse = await fetch("/api/voice/transcribe", {
+      method: "POST",
+      body: formData,
+    });
+    if (!transcriptionResponse.ok) {
+      toast.error("Could not transcribe your recording.");
+      return;
+    }
+
+    const { text: transcribedText } = (await transcriptionResponse.json()) as { text: string };
+    const transcript = transcribedText.trim();
     lastTranscriptRef.current = transcript;
     onUserTranscriptChange?.(transcript, true);
 

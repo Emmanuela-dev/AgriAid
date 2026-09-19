@@ -241,40 +241,21 @@ Supported languages include English, Kiswahili, Kikuyu, Luo, Luhya, Kamba, Kalen
   );
 
   const speakTextViaTTS = useCallback(
-    async (text: string, voiceName: string = "Aoede") => {
-      if (!audioStreamerRef.current || !text.trim()) return;
+    async (text: string) => {
+      if (!text.trim()) return;
 
-      const ttsRes = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text }] }],
-            generationConfig: {
-              responseModalities: ["AUDIO"],
-              speechConfig: {
-                voiceConfig: { prebuiltVoiceConfig: { voiceName } },
-              },
-            },
-          }),
-        },
-      );
+      const response = await fetch("/api/voice/speak", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      if (!response.ok) throw new Error("ElevenLabs speech generation failed.");
 
-      const ttsData = await ttsRes.json();
-      const audioB64 = ttsData.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-      if (!audioB64 || !audioStreamerRef.current) return;
-
-      const streamer = audioStreamerRef.current;
-      if (streamer.context.state === "suspended") {
-        await streamer.context.resume();
-      }
-      streamer.isStreamComplete = false;
-      const bytes = Uint8Array.from(atob(audioB64), (c) => c.charCodeAt(0));
-      streamer.addPCM16(bytes);
-      setTimeout(() => streamer.complete(), 500);
+      const audio = new Audio(URL.createObjectURL(await response.blob()));
+      audio.onended = () => URL.revokeObjectURL(audio.src);
+      await audio.play();
     },
-    [apiKey],
+    [],
   );
 
   // register audio for streaming server -> speakers
@@ -459,7 +440,11 @@ Supported languages include English, Kiswahili, Kikuyu, Luo, Luhya, Kamba, Kalen
         await new Promise(resolve => setTimeout(resolve, 1000));
         
         setLatestResponse(response);
-        speakTextOffline(response);
+        try {
+          await speakTextViaTTS(response);
+        } catch (error) {
+          console.error("ElevenLabs speech unavailable while offline:", error);
+        }
         setIsResponding(false);
         return;
       }
@@ -482,23 +467,6 @@ Supported languages include English, Kiswahili, Kikuyu, Luo, Luhya, Kamba, Kalen
           resolvedLanguage !== "same language as the farmer's input"
         ) {
           setDetectedInputLanguage(resolvedLanguage);
-        }
-
-        const liveSocketReady =
-          connected && client.ws?.readyState === WebSocket.OPEN;
-
-        if (liveSocketReady) {
-          try {
-            client.send(
-              {
-                text: `Respond only in ${resolvedLanguage}. When speaking, use authentic native ${resolvedLanguage} accent and pronunciation used by local Kenyan speakers. Do not anglicize pronunciations. Farmer question: ${text}`,
-              },
-              true,
-            );
-            return;
-          } catch (liveSendError) {
-            console.error("Live send failed, using fallback:", liveSendError);
-          }
         }
 
         const res = await fetch(
@@ -544,7 +512,7 @@ PHONETIC & RHYTHMIC TUNING:
         setIsResponding(false);
       }
     },
-    [client, connected, detectLanguageFromText, isAgriculturalQuestion, speakTextViaTTS],
+    [apiKey, detectLanguageFromText, isAgriculturalQuestion, speakTextViaTTS],
   );
 
   return {

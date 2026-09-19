@@ -64,6 +64,10 @@ NEXT_PUBLIC_TOKEN_SECRETE=replace_with_a_strong_random_secret
 # Gemini
 NEXT_PUBLIC_GEMINI_API_KEY=replace_with_gemini_api_key
 
+# ElevenLabs voice agent
+ELEVENLABS_API_KEY=replace_with_elevenlabs_api_key
+ELEVENLABS_VOICE_ID=replace_with_elevenlabs_voice_id
+
 # Google Maps / Routes
 NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=replace_with_google_maps_api_key
 

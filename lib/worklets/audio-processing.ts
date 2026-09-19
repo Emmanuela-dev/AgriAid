@@ -11,6 +11,11 @@ class AudioProcessingWorklet extends AudioWorkletProcessor {
   constructor() {
     super();
     this.hasAudio = false;
+    this.port.onmessage = (event) => {
+      if (event.data === "flush" && this.bufferWriteIndex > 0) {
+        this.sendAndClearBuffer();
+      }
+    };
   }
 
   /**
