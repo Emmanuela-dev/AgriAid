@@ -1,0 +1,305 @@
+/* AgroVoice Voice Agent Styles */
+
+.agrovoice-container {
+  width: 100%;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.agrovoice-card {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border-radius: 1.5rem;
+  border: 2px solid #22c55e;
+  padding: 2.5rem 2rem;
+  box-shadow: 0 10px 25px -5px rgba(34, 197, 94, 0.1),
+              0 8px 10px -6px rgba(34, 197, 94, 0.1);
+  transition: all 0.3s ease;
+}
+
+.agrovoice-card:hover {
+  box-shadow: 0 20px 35px -5px rgba(34, 197, 94, 0.15),
+              0 12px 15px -6px rgba(34, 197, 94, 0.15);
+}
+
+/* Status Containers */
+.agrovoice-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 1rem;
+}
+
+/* Idle State */
+.agrovoice-status-idle {
+  animation: fadeIn 0.4s ease-in-out;
+}
+
+.agrovoice-icon-container {
+  width: 120px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  border-radius: 50%;
+  margin-bottom: 1rem;
+  box-shadow: 0 8px 20px rgba(34, 197, 94, 0.3);
+}
+
+.agrovoice-mic-icon-large {
+  color: white;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+/* Connecting State */
+.agrovoice-status-connecting {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.agrovoice-spinner {
+  animation: spin 1s linear infinite;
+  color: #16a34a;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Connected/Active State */
+.agrovoice-status-connected {
+  animation: fadeIn 0.4s ease-in-out;
+}
+
+.agrovoice-pulse-indicator {
+  width: 120px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  border-radius: 50%;
+  position: relative;
+  margin-bottom: 1.5rem;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.agrovoice-pulse-indicator::before,
+.agrovoice-pulse-indicator::after {
+  content: "";
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 2px solid #22c55e;
+  opacity: 0;
+  animation: ripple 2s ease-out infinite;
+}
+
+.agrovoice-pulse-indicator::after {
+  animation-delay: 1s;
+}
+
+@keyframes ripple {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+.agrovoice-mic-icon {
+  color: white;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+/* Error State */
+.agrovoice-status-error {
+  animation: shake 0.5s ease-in-out;
+}
+
+.agrovoice-error-icon {
+  color: #dc2626;
+  margin-bottom: 0.5rem;
+}
+
+.agrovoice-error-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #991b1b;
+  margin-bottom: 0.5rem;
+}
+
+.agrovoice-error-message {
+  font-size: 0.95rem;
+  color: #7f1d1d;
+  max-width: 90%;
+  margin: 0 auto 1.5rem;
+  line-height: 1.5;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-10px); }
+  75% { transform: translateX(10px); }
+}
+
+/* Typography */
+.agrovoice-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #166534;
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.02em;
+}
+
+.agrovoice-subtitle {
+  font-size: 1rem;
+  color: #15803d;
+  max-width: 90%;
+  margin: 0 auto 1.5rem;
+  line-height: 1.6;
+}
+
+/* Buttons */
+.agrovoice-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.875rem 2rem;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 9999px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1),
+              0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.agrovoice-button:active {
+  transform: scale(0.97);
+}
+
+.agrovoice-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Start Button */
+.agrovoice-button-start {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  color: white;
+}
+
+.agrovoice-button-start:hover {
+  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+  box-shadow: 0 10px 15px -3px rgba(34, 197, 94, 0.3),
+              0 4px 6px -2px rgba(34, 197, 94, 0.25);
+}
+
+/* End Button */
+.agrovoice-button-end {
+  background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+  color: white;
+}
+
+.agrovoice-button-end:hover {
+  background: linear-gradient(135deg, #991b1b 0%, #7f1d1d 100%);
+  box-shadow: 0 10px 15px -3px rgba(220, 38, 38, 0.3),
+              0 4px 6px -2px rgba(220, 38, 38, 0.25);
+}
+
+/* Retry Button */
+.agrovoice-button-retry {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: white;
+}
+
+.agrovoice-button-retry:hover {
+  background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+  box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3),
+              0 4px 6px -2px rgba(37, 99, 235, 0.25);
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 640px) {
+  .agrovoice-card {
+    padding: 2rem 1.5rem;
+  }
+
+  .agrovoice-title {
+    font-size: 1.25rem;
+  }
+
+  .agrovoice-subtitle {
+    font-size: 0.9rem;
+  }
+
+  .agrovoice-icon-container,
+  .agrovoice-pulse-indicator {
+    width: 100px;
+    height: 100px;
+  }
+
+  .agrovoice-mic-icon-large {
+    width: 56px;
+    height: 56px;
+  }
+
+  .agrovoice-mic-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .agrovoice-button {
+    padding: 0.75rem 1.5rem;
+    font-size: 0.95rem;
+  }
+}
+
+/* Dark Mode Support (optional) */
+@media (prefers-color-scheme: dark) {
+  .agrovoice-card {
+    background: linear-gradient(135deg, #064e3b 0%, #065f46 100%);
+    border-color: #10b981;
+  }
+
+  .agrovoice-title {
+    color: #d1fae5;
+  }
+
+  .agrovoice-subtitle {
+    color: #a7f3d0;
+  }
+}

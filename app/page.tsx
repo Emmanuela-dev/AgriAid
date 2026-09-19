@@ -2,7 +2,7 @@
 import React, { useContext, useState } from "react";
 import Sidebar from "../components/common/Sidebar";
 import navigationContext from "@/context/NavigationContext";
-import VoiceChat from "@/components/farmerDashboard/VoiceChat";
+import AgroVoiceComponent from "@/components/farmerDashboard/AgroVoiceComponent";
 import { LandingTransition } from "@/components/landing";
 
 const Page = () => {
@@ -26,7 +26,7 @@ const Page = () => {
             <Sidebar />
           </div>
           <div className="w-full">{currentComponent}</div>
-          <VoiceChat />
+          <AgroVoiceComponent />
         </main>
       ) : (
         <LandingTransition setIsTrue={setIsTrue} />

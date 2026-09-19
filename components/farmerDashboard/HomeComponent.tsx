@@ -16,7 +16,7 @@ const HomeComponent = () => {
   const [inProgressYards, setInProgressYards] = useState<Yard[]>([]);
   const [completedyards, setCompletedYards] = useState<Yard[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [showVoiceChat, setShowVoiceChat] = useState<boolean>(false);
+  const [showVoiceChat, setShowVoiceChat] = useState(false);
 
   const toggleVoiceChat = () => {
     setShowVoiceChat((prev) => !prev);
@@ -267,12 +267,16 @@ const HomeComponent = () => {
           </div>
         )}
       </div>
+      
+      {/* Floating Voice Button */}
       <div
-        onClick={() => toggleVoiceChat()}
-        className="fixed bottom-5 rounded-full z-[100]  bg-primary_green hover:scale-105 hover:rotate-12 transform transition-all duration-300 cursor-pointer p-3 sm:p-4 border-primary_green right-4"
+        onClick={toggleVoiceChat}
+        className="fixed bottom-5 right-4 rounded-full z-[100] bg-primary_green hover:scale-105 hover:rotate-12 transform transition-all duration-300 cursor-pointer p-3 sm:p-4 border-primary_green"
       >
-        <Mic className=" h-6 sm:h-8 w-6 sm:w-8 text-white" />
+        <Mic className="h-6 sm:h-8 w-6 sm:w-8 text-white" />
       </div>
+      
+      {/* Voice Chat Interface */}
       {showVoiceChat && <VoiceChat />}
     </div>
   );
